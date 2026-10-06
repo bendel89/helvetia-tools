@@ -89,6 +89,7 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
 .item .open{background:transparent;color:var(--text);text-align:left;flex:1;padding:0}
 .item label{display:flex;align-items:center;gap:10px;flex:1;cursor:pointer}
 .item input[type=checkbox]{width:18px;height:18px}
+.item .share-btn{background:#eef6ff;color:#15538a;border-radius:8px;padding:7px 9px}
 .done{text-decoration:line-through;color:var(--muted)}
 .badge{display:block;font-size:12px;color:var(--muted)}
 .badge.late{color:#b51218;font-weight:700}
@@ -109,16 +110,17 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
 .row{display:flex;align-items:center;gap:7px;margin:4px 0}
 .letter-preview{background:#fff;color:#1a1a1a;border:1px solid #d0d4d8;border-radius:8px;padding:32px 36px;font-family:Georgia,"Times New Roman",Times,serif;font-size:15px;line-height:1.7;white-space:pre-wrap;word-wrap:break-word;box-shadow:0 2px 12px rgba(0,0,0,.08);min-height:260px;margin-top:10px}
 .letter-preview:empty::before{content:"📝 La lettre générée s'affichera ici en aperçu papier.\A\A Remplissez les champs ci-dessus puis appuyez sur « Générer ».";color:#9aa1a9;font-style:italic;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;font-size:14px;white-space:pre-wrap}
-@media(max-width:700px){.letter-preview{padding:22px 20px;font-size:14px}.form-grid,.tool-grid{grid-template-columns:1fr}.panel-header h2{font-size:17px}}
-@media(max-width:430px){.card{min-height:125px;padding:14px}.card-icon{font-size:27px}.card h3{font-size:15px}.card p{font-size:12px}.favorite-panel-btn{font-size:11px;padding:7px 8px}}
-@media print{body *{visibility:hidden}.letter-preview,.letter-preview *{visibility:visible}.letter-preview{position:absolute;left:0;top:0;width:100%;border:0;box-shadow:none;padding:0;margin:0}}
 .back-to-top{position:fixed;bottom:96px;right:16px;z-index:250;width:48px;height:48px;border:0;border-radius:50%;background:var(--red);color:#fff;font-size:22px;line-height:1;box-shadow:0 4px 14px rgba(0,0,0,.25);cursor:pointer;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;transform:translateY(10px)}
 .back-to-top.show{opacity:.95;pointer-events:auto;transform:translateY(0)}
-.back-to-top:hover{opacity:1}
-@media print{.back-to-top{display:none}}
+.mic-btn{background:#f0f4f8;color:#333;border:1px solid var(--border);padding:8px 12px;border-radius:9px;font-size:13px;font-weight:600;margin-top:6px}
+.mic-btn.recording{background:#ffe4e4;color:#b51218;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+@media(max-width:700px){.letter-preview{padding:22px 20px;font-size:14px}.form-grid,.tool-grid{grid-template-columns:1fr}.panel-header h2{font-size:17px}}
+@media(max-width:430px){.card{min-height:125px;padding:14px}.card-icon{font-size:27px}.card h3{font-size:15px}.card p{font-size:12px}.favorite-panel-btn{font-size:11px;padding:7px 8px}}
+@media print{body *{visibility:hidden}.letter-preview,.letter-preview *{visibility:visible}.letter-preview{position:absolute;left:0;top:0;width:100%;border:0;box-shadow:none;padding:0;margin:0}.back-to-top{display:none}}
 </style>
 </head>
-  <body>
+<body>
 
 <header class="header">
   <div class="header-top">
@@ -146,6 +148,7 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
   <div class="section">
     <div class="section-title">Que recherchez-vous ?</div>
     <div class="field"><textarea id="assistantInput" placeholder="Ex. : un numéro suisse, un appartement, une arnaque…" maxlength="2000"></textarea></div>
+    <button type="button" class="mic-btn" onclick="startDictation('assistantInput', this)">🎤 Dicter</button>
     <div class="btn-row">
       <button type="button" class="btn primary" onclick="analyzeAssistant()">🤖 Analyser</button>
       <button type="button" class="btn" onclick="$('assistantInput').value='';$('assistantResult').innerHTML=''">Effacer</button>
@@ -168,7 +171,7 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
 <section id="panel-documents" class="panel"><div class="panel-body">
   <div class="section">
     <div class="section-title">Documents et échéances</div>
-    <p class="small" style="margin-bottom:10px">Ajoutez une échéance : les documents en retard apparaissent en rouge.</p>
+    <p class="small" style="margin-bottom:10px">Ajoutez une échéance : les documents en retard apparaissent en rouge. Appuyez sur 📤 pour partager.</p>
     <div id="documentsList"></div>
     <div class="btn-row">
       <button type="button" class="btn primary" onclick="addItem('documents')">➕ Ajouter</button>
@@ -199,6 +202,7 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
   <div class="section">
     <div class="section-title">📩 Texte à analyser</div>
     <div class="field"><textarea id="scamText" placeholder="Collez un SMS, e-mail, message suspect..." maxlength="12000"></textarea></div>
+    <button type="button" class="mic-btn" onclick="startDictation('scamText', this)">🎤 Dicter</button>
     <div class="btn-row">
       <button type="button" class="btn primary" onclick="analyzeScamText()">🛡️ Analyser</button>
       <button type="button" class="btn" onclick="extractOCR()">🔤 Lire texte / QR</button>
@@ -282,6 +286,23 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
     <div id="moneyResult" aria-live="polite"></div>
   </div>
   <div class="section">
+    <div class="section-title">🏛️ Estimation d'impôts (simplifiée)</div>
+    <p class="small" style="margin-bottom:8px">Estimation très approximative. Votre vrai impôt dépend de votre situation complète.</p>
+    <div class="form-grid">
+      <div class="field"><label for="taxCanton">Canton</label>
+        <select id="taxCanton"><option value="VD">Vaud (VD)</option><option value="GE">Genève (GE)</option><option value="VS">Valais (VS)</option><option value="FR">Fribourg (FR)</option><option value="NE">Neuchâtel (NE)</option><option value="JU">Jura (JU)</option><option value="BE">Berne (BE)</option><option value="ZH">Zurich (ZH)</option><option value="TI">Tessin (TI)</option></select></div>
+      <div class="field"><label for="taxMarital">Situation</label>
+        <select id="taxMarital"><option value="single">Célibataire</option><option value="married">Marié(e)</option></select></div>
+      <div class="field"><label for="taxIncome">Revenu annuel brut (CHF)</label><input id="taxIncome" type="number" min="0" step="100" inputmode="decimal"></div>
+      <div class="field"><label for="taxDeductions">Déductions annuelles (CHF)</label><input id="taxDeductions" type="number" min="0" step="100" inputmode="decimal" value="0"></div>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="btn primary" onclick="calcTaxes()">🏛️ Estimer</button>
+      <button type="button" class="btn danger" onclick="clearTaxes()">🗑️ Effacer</button>
+    </div>
+    <div id="taxResult" aria-live="polite"></div>
+  </div>
+  <div class="section">
     <div class="section-title">🧰 Outils financiers</div>
     <div class="tool-grid">
       <div class="tool"><h3>📊 Budget</h3><p>Calculez vos dépenses et votre solde mensuel.</p></div>
@@ -331,6 +352,7 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
   <div class="section">
     <div class="section-title">🕵️ Vérifier une annonce</div>
     <div class="field"><textarea id="listingText" placeholder="Collez l'annonce ou le message du propriétaire..." maxlength="6000"></textarea></div>
+    <button type="button" class="mic-btn" onclick="startDictation('listingText', this)">🎤 Dicter</button>
     <div class="btn-row">
       <button type="button" class="btn primary" onclick="checkListing()">🛡️ Analyser</button>
       <button type="button" class="btn" onclick="clearListing()">Effacer</button>
@@ -409,6 +431,25 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
       <button type="button" class="btn danger" onclick="clearHealth()">🗑️ Effacer</button>
     </div>
     <div id="healthResult" aria-live="polite"></div>
+  </div>
+  <div class="section">
+    <div class="section-title">💰 Comparateur de primes LAMal (estimation)</div>
+    <p class="small" style="margin-bottom:8px">Estimation basée sur des moyennes 2025. Les vraies primes varient selon la caisse, la région et le modèle.</p>
+    <div class="form-grid">
+      <div class="field"><label for="pAge">Âge</label>
+        <select id="pAge"><option value="young">18-25 ans</option><option value="adult" selected>26-50 ans</option><option value="senior">51-65 ans</option></select></div>
+      <div class="field"><label for="pCanton">Canton</label>
+        <select id="pCanton"><option value="VD">Vaud</option><option value="GE">Genève</option><option value="VS">Valais</option><option value="FR">Fribourg</option><option value="NE">Neuchâtel</option><option value="JU">Jura</option><option value="BE">Berne</option><option value="ZH">Zurich</option><option value="TI">Tessin</option></select></div>
+      <div class="field"><label for="pModel">Modèle</label>
+        <select id="pModel"><option value="standard">Standard</option><option value="family">Médecin de famille</option><option value="telmed">Telmed</option><option value="hmo">HMO</option></select></div>
+      <div class="field"><label for="pFranchise">Franchise</label>
+        <select id="pFranchise"><option>300</option><option>500</option><option>1000</option><option>1500</option><option>2000</option><option selected>2500</option></select></div>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="btn primary" onclick="calcPrimeRange()">💰 Estimer</button>
+      <button type="button" class="btn danger" onclick="clearPrimeRange()">🗑️ Effacer</button>
+    </div>
+    <div id="pPrimeResult" aria-live="polite"></div>
   </div>
   <div class="section">
     <div class="section-title">✅ Mes étapes</div>
@@ -513,6 +554,8 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
     <div class="btn-row">
       <button type="button" class="btn primary" onclick="makeLetter()">✉️ Générer</button>
       <button type="button" class="btn" onclick="copyLetter()">📋 Copier</button>
+      <button type="button" class="btn green" onclick="downloadLetterPDF()">💾 Enregistrer en PDF</button>
+      <button type="button" class="btn" onclick="shareLetter()">📤 Partager</button>
       <button type="button" class="btn blue" onclick="printLetter()">🖨️ Imprimer</button>
       <button type="button" class="btn danger" onclick="clearLetter()">🗑️ Effacer</button>
     </div>
@@ -532,9 +575,17 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
     <div class="btn-row">
       <button type="button" class="btn danger" onclick="restoreApp()">↩️ Restaurer</button>
       <button type="button" class="btn" onclick="exportData()">📋 Copier mes données</button>
+      <button type="button" class="btn" onclick="downloadData()">💾 Télécharger mes données</button>
       <button type="button" class="btn danger" onclick="clearAllData()">🗑️ Tout effacer</button>
     </div>
     <div id="settingsResult" aria-live="polite"></div>
+  </div>
+  <div class="section">
+    <div class="section-title">📤 Partage de l'app</div>
+    <p class="small">Envoyez le lien de l'app à vos proches.</p>
+    <div class="btn-row">
+      <button type="button" class="btn primary" onclick="shareApp()">📤 Partager Helvetia-Tools</button>
+    </div>
   </div>
 </div></section>
 
@@ -563,7 +614,7 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.0/dist/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
-    <script>
+<script>
 "use strict";
 
 const $ = id => document.getElementById(id);
@@ -599,7 +650,6 @@ const DEFAULT_DATA = {
 
 const link = (icon,label,sub,url) => ({icon,label,sub,module:"admin",direct:true,run:()=>openExternal(url)});
 
-/* ---------- CORRIGÉ : Boutons téléphone utiles (NCSC + antiphishing.ch) ---------- */
 const ACTIONS = {
   phoneLocal:{icon:"📞",label:"local.ch",sub:"Annuaire commercial",module:"phone",run:()=>phoneSearch("local")},
   phoneSearch:{icon:"🔎",label:"search.ch",sub:"Annuaire inversé suisse",module:"phone",run:()=>phoneSearch("searchch")},
@@ -627,6 +677,7 @@ let appData = loadData();
 let cameraStream = null, lastScamImage = null, assistantCompany = "";
 let lastRent = null, lastBill = null, billStream = null, billTimer = null;
 let lastQr = null, calItems = [], toastTimer = null;
+let activeRecognition = null, activeRecognitionBtn = null;
 
 const escapeHtml = (() => {
   const cache = new Map();
@@ -678,6 +729,170 @@ function showToast(msg){
   clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 2500);
 }
 
+/* ============ NOUVEAU : Partage natif ============ */
+async function shareText(title, text){
+  if(navigator.share){
+    try{ await navigator.share({title, text}); return true; }
+    catch(e){ if(e.name === "AbortError") return false; }
+  }
+  copyText(text);
+  return false;
+}
+
+function shareItem(key, i){
+  const item = appData[key] && appData[key][i];
+  if(!item) return;
+  const t = (item.done ? "✅ " : "📌 ") + item.text + (item.due ? "\n📅 Échéance : " + fmtDate(item.due) : "");
+  shareText("Helvetia-Tools", t);
+}
+
+function shareLetter(){
+  const text = $("lOut").dataset.raw || "";
+  if(!text){ showToast("Générez d'abord la lettre"); return; }
+  shareText("Lettre — Helvetia-Tools", text);
+}
+
+function shareApp(){
+  const url = "https://bendel89.github.io/helvetia-tools/";
+  shareText("Helvetia-Tools", "Découvrez Helvetia-Tools, l'assistant suisse pour les démarches du quotidien :\n" + url);
+}
+
+/* ============ NOUVEAU : Dictée vocale ============ */
+function startDictation(targetId, btn){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){ showToast("Dictée non supportée sur ce navigateur"); return; }
+  if(activeRecognition){ activeRecognition.stop(); return; }
+  const rec = new SR();
+  rec.lang = "fr-CH";
+  rec.interimResults = false;
+  rec.maxAlternatives = 1;
+  rec.continuous = false;
+  const el = $(targetId);
+  if(!el){ showToast("Champ introuvable"); return; }
+  activeRecognition = rec;
+  activeRecognitionBtn = btn;
+  if(btn) btn.classList.add("recording");
+  showToast("🎤 Parlez maintenant…");
+  rec.onresult = e => {
+    const txt = e.results[0][0].transcript;
+    el.value = (el.value ? el.value + " " : "") + txt;
+    showToast("✅ Texte ajouté");
+  };
+  rec.onerror = e => {
+    const msg = e.error === "not-allowed" ? "Micro refusé" : "Erreur dictée : " + (e.error || "inconnue");
+    showToast(msg);
+  };
+  rec.onend = () => {
+    activeRecognition = null;
+    if(activeRecognitionBtn) activeRecognitionBtn.classList.remove("recording");
+    activeRecognitionBtn = null;
+  };
+  try{ rec.start(); }catch(e){ showToast("Impossible de démarrer"); activeRecognition = null; }
+}
+
+/* ============ NOUVEAU : PDF lettre ============ */
+function downloadLetterPDF(){
+  const text = $("lOut").dataset.raw || "";
+  if(!text){ showToast("Générez d'abord la lettre"); return; }
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Lettre</title>
+    <style>@page{margin:2cm}body{font-family:Georgia,serif;font-size:15px;line-height:1.7;color:#000;white-space:pre-wrap;padding:0;margin:0}</style>
+    </head><body>${escapeHtml(text)}</body></html>`;
+  const w = window.open("", "_blank");
+  if(!w){ showToast("Autorisez les pop-ups pour exporter"); return; }
+  w.document.write(html);
+  w.document.close();
+  setTimeout(() => { try{ w.focus(); w.print(); }catch(e){} }, 500);
+  showToast("Dans la fenêtre → Enregistrer en PDF");
+}
+
+/* ============ NOUVEAU : Télécharger données JSON ============ */
+function downloadData(){
+  try{
+    const blob = new Blob([JSON.stringify(appData, null, 2)], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "helvetia-tools-donnees-" + todayStr() + ".json";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    showToast("Fichier téléchargé");
+  }catch(e){ showToast("Téléchargement impossible"); }
+}
+
+/* ============ NOUVEAU : Calcul impôts simplifié ============ */
+function calcTaxes(){
+  const canton = $("taxCanton").value;
+  const situation = $("taxMarital").value;
+  const income = parseFloat($("taxIncome").value) || 0;
+  const ded = parseFloat($("taxDeductions").value) || 0;
+  const out = $("taxResult");
+  if(income <= 0){ out.innerHTML = `<div class="result warning">Saisissez un revenu annuel.</div>`; return; }
+  const base = Math.max(0, income - ded);
+  // Taux marginaux approximatifs (impôt fédéral + cantonal + communal, personne seule ou couple)
+  const rates = {
+    VD:{single:[[0,.0],[15000,.05],[30000,.10],[50000,.15],[80000,.20],[120000,.25],[200000,.30]], married:[[0,.0],[30000,.05],[60000,.10],[90000,.15],[130000,.20],[180000,.25],[250000,.30]]},
+    GE:{single:[[0,.0],[18000,.05],[35000,.11],[60000,.16],[90000,.21],[150000,.26],[250000,.31]], married:[[0,.0],[35000,.05],[65000,.11],[100000,.16],[150000,.21],[220000,.26],[320000,.31]]},
+    VS:{single:[[0,.0],[14000,.05],[28000,.10],[45000,.14],[70000,.18],[110000,.22],[180000,.26]], married:[[0,.0],[28000,.05],[55000,.10],[85000,.14],[120000,.18],[170000,.22],[240000,.26]]},
+    FR:{single:[[0,.0],[15000,.05],[30000,.10],[50000,.14],[75000,.18],[120000,.22],[190000,.26]], married:[[0,.0],[30000,.05],[60000,.10],[90000,.14],[130000,.18],[180000,.22],[260000,.26]]},
+    NE:{single:[[0,.0],[15000,.05],[30000,.11],[50000,.16],[80000,.21],[130000,.25],[200000,.29]], married:[[0,.0],[30000,.05],[60000,.11],[90000,.16],[130000,.21],[190000,.25],[280000,.29]]},
+    JU:{single:[[0,.0],[14000,.05],[28000,.10],[45000,.15],[70000,.19],[110000,.23],[180000,.27]], married:[[0,.0],[28000,.05],[55000,.10],[85000,.15],[120000,.19],[170000,.23],[250000,.27]]},
+    BE:{single:[[0,.0],[15000,.05],[30000,.10],[50000,.14],[75000,.18],[120000,.22],[190000,.26]], married:[[0,.0],[30000,.05],[60000,.10],[90000,.14],[130000,.18],[180000,.22],[260000,.26]]},
+    ZH:{single:[[0,.0],[14000,.05],[28000,.09],[50000,.13],[80000,.17],[130000,.21],[200000,.25]], married:[[0,.0],[28000,.05],[56000,.09],[90000,.13],[130000,.17],[190000,.21],[280000,.25]]},
+    TI:{single:[[0,.0],[15000,.05],[30000,.10],[50000,.15],[80000,.19],[130000,.23],[200000,.27]], married:[[0,.0],[30000,.05],[60000,.10],[90000,.15],[130000,.19],[190000,.23],[280000,.27]]}
+  };
+  const table = (rates[canton] || rates.VD)[situation];
+  let tax = 0;
+  for(let i = 0; i < table.length; i++){
+    const [threshold, rate] = table[i];
+    const next = (table[i+1] && table[i+1][0]) || base;
+    if(base > threshold){
+      const slice = Math.min(base, next) - threshold;
+      tax += slice * rate;
+    }
+  }
+  const eff = (tax / income * 100).toFixed(1);
+  out.innerHTML = `<div class="result info"><strong>🏛️ Estimation d'impôt — ${escapeHtml(canton)}</strong><br><br>
+    Revenu imposable : <strong>${formatCHF(base)}</strong><br>
+    Impôt annuel estimé : <strong>${formatCHF(tax)}</strong><br>
+    Taux effectif : <strong>${eff} %</strong><br><br>
+    <span class="small">⚠️ Estimation très approximative. Votre vrai impôt dépend de votre fortune, enfants, transports, etc. Consultez l'administration fiscale de votre canton.</span></div>`;
+}
+function clearTaxes(){
+  ["taxIncome","taxDeductions"].forEach(id => { const el = $(id); if(el) el.value = ""; });
+  $("taxResult").innerHTML = "";
+}
+
+/* ============ NOUVEAU : Comparateur primes LAMal ============ */
+function calcPrimeRange(){
+  const age = $("pAge").value;
+  const canton = $("pCanton").value;
+  const model = $("pModel").value;
+  const franchise = +$("pFranchise").value;
+  const out = $("pPrimeResult");
+  // Base moyenne adulte 2025 selon canton (CHF/mois)
+  const baseByCanton = {VD:450, GE:520, VS:400, FR:410, NE:480, JU:450, BE:420, ZH:400, TI:440};
+  let base = baseByCanton[canton] || 430;
+  // Âge
+  if(age === "young") base *= 0.65;
+  if(age === "senior") base *= 1.25;
+  // Modèle
+  const modelAdj = {standard:1, family:0.95, telmed:0.92, hmo:0.88};
+  base *= modelAdj[model] || 1;
+  // Franchise (approx : plus la franchise est haute, plus la prime baisse)
+  const franchiseAdj = {300:1.15, 500:1.10, 1000:1.05, 1500:1.00, 2000:0.95, 2500:0.90};
+  base *= franchiseAdj[franchise] || 1;
+  const low = base * 0.75;
+  const high = base * 1.30;
+  out.innerHTML = `<div class="result success"><strong>💰 Estimation prime mensuelle</strong><br><br>
+    Canton : <strong>${escapeHtml(canton)}</strong><br>
+    Profil : <strong>${escapeHtml(age === "young" ? "18-25 ans" : age === "senior" ? "51-65 ans" : "26-50 ans")}</strong> · ${escapeHtml(model)}<br>
+    Franchise : <strong>CHF ${franchise}</strong><br><br>
+    Fourchette : <strong>CHF ${Math.round(low)} – ${Math.round(high)} / mois</strong><br><br>
+    <span class="small">⚠️ Estimation basée sur des moyennes 2025. Les vraies primes varient fortement selon la caisse. Comparez sur priminfo.admin.ch.</span></div>`;
+}
+function clearPrimeRange(){ $("pPrimeResult").innerHTML = ""; }
+
+/* ============ Persistance ============ */
 function cloneDefault(){ return JSON.parse(JSON.stringify(DEFAULT_DATA)); }
 
 function loadData(){
@@ -704,6 +919,7 @@ function ensureData(){
 
 function saveData(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(appData)); }catch(e){ console.error(e); } }
 
+/* ============ Construction interface ============ */
 function buildUI(){
   $("homeGrid").innerHTML = Object.entries(MODULES).map(([k,m]) => `
     <div class="card">
@@ -768,6 +984,7 @@ function updateBottomNav(active){
   const nav = $("nav-" + active); if(nav) nav.classList.add("active");
 }
 
+/* ============ Favoris ============ */
 function favInfo(key){
   if(String(key).startsWith("act:")){
     const a = ACTIONS[key.slice(4)];
@@ -822,6 +1039,7 @@ async function clearFavorites(){
   appData.favorites = []; saveData(); refreshFavorites(); showToast("Favoris supprimés");
 }
 
+/* ============ Assistant ============ */
 const RULES = [
   ["phone", /numero|telephone|portable|appel|\+41|\b0\d{2}[\s.]?\d{3}/],
   ["scam", /arnaque|scam|suspect|phishing|sms|e-?mail|lien/],
@@ -877,6 +1095,7 @@ function analyzeAssistant(){
 
 function quickCompany(kind){ const name = assistantCompany; if(!name) return; openExternal(companyUrl(kind, name)); if(kind === "zefix") copyQuiet(name); }
 
+/* ============ Téléphone ============ */
 function normalizePhone(value){
   let p = String(value || "").replace(/[^\d+]/g,"");
   if(p.startsWith("0041")) p = "+41" + p.slice(4);
@@ -922,7 +1141,6 @@ function phoneSearch(kind){
   const d = validSwissDigits(raw);
   if(!d){ showToast("Entrez d'abord un numéro suisse valide"); return; }
   const local = "0" + d.slice(2);
-  const formatted = formatSwissPhone(raw);
   if(kind === "local") openExternal("https://www.local.ch/fr/q?what=" + encodeURIComponent(local));
   if(kind === "searchch") openExternal("https://search.ch/tel/?was=" + encodeURIComponent(local));
   copyQuiet(local);
@@ -954,6 +1172,7 @@ function renderNumbers(){
 
 function removeNumber(i){ appData.numbers.splice(i,1); saveData(); renderNumbers(); }
 
+/* ============ Entreprise ============ */
 function getCompany(){ return $("companyInput").value.trim(); }
 
 function companyUrl(kind, name){
@@ -963,7 +1182,6 @@ function companyUrl(kind, name){
   return "https://www.google.com/search?q=" + encodeURIComponent(name + " Suisse");
 }
 
-/* ---------- CORRIGÉ : recherche entreprise va sur Zefix (officiel) ---------- */
 function checkCompany(){
   const name = getCompany();
   if(!name){ $("companyResult").innerHTML = `<div class="result warning">Entrez le nom d'une entreprise.</div>`; return; }
@@ -980,7 +1198,8 @@ function companySearch(kind){
 
 function clearCompany(){ $("companyInput").value = ""; $("companyResult").innerHTML = ""; }
 
-function renderMoney(){ MONEY_FIELDS.forEach(([k]) => { $("money_" + k).value = appData.money[k] ?? ""; }); }
+/* ============ Argent ============ */
+function renderMoney(){ MONEY_FIELDS.forEach(([k]) => { const el = $("money_" + k); if(el) el.value = appData.money[k] ?? ""; }); }
 
 function getMoneyValues(){
   const v = {};
@@ -1013,6 +1232,7 @@ function moneyBars(v){
   }).join("")}<div class="small" style="margin-top:8px">Le loyer apparaît en rouge s'il dépasse environ un tiers du revenu.</div></div>`;
 }
 
+/* ============ Logement ============ */
 const HOUSING_IDS = {place:"housingPlace",canton:"housingCanton",type:"housingType",rooms:"housingRooms",maxRent:"housingMaxRent",availability:"housingAvailability"};
 
 function getHousing(){
@@ -1073,6 +1293,7 @@ function openSubsidizedHousing(){
   $("housingSearchResult").innerHTML = `<div class="result info">🏛️ Page des logements subventionnés de Vaud ouverte.<br>${place ? "Commune recherchée : <strong>" + escapeHtml(place) + "</strong>" : "Cherchez votre commune sur le site."}</div>`;
 }
 
+/* ============ Listes ============ */
 function renderList(key){
   const c = $(key + "List");
   const items = appData[key] || [];
@@ -1083,7 +1304,8 @@ function renderList(key){
     return `<div class="item"><label><input type="checkbox" ${it.done ? "checked" : ""} onchange="toggleItem('${key}',${i})">
       <span><span class="${it.done ? "done" : ""}">${escapeHtml(it.text)}</span>
       ${it.due ? `<span class="badge ${late ? "late" : ""}">${late ? "⚠️ En retard : " : "📅 Échéance : "}${fmtDate(it.due)}</span>` : ""}</span></label>
-      <button type="button" onclick="removeItem('${key}',${i})" aria-label="Supprimer">×</button></div>`;
+      <button type="button" class="share-btn" onclick="shareItem('${key}',${i})" aria-label="Partager">📤</button>
+      <button type="button" onclick="removeItem('${key}',${i})" aria-label="Supprimer" style="margin-left:4px">×</button></div>`;
   }).join("")}</div>`;
 }
 
@@ -1117,6 +1339,7 @@ function copyList(key){
   copyText(items.map(i => (i.done ? "[x] " : "[ ] ") + i.text + (i.due ? " (" + fmtDate(i.due) + ")" : "")).join("\n"));
 }
 
+/* ============ Caméra / Scam ============ */
 async function startCamera(){
   if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ showToast("Caméra non disponible"); return; }
   try{
@@ -1184,7 +1407,7 @@ async function extractOCR(){
   result.innerHTML = `<div class="result info">🔤 Lecture de l'image en cours...</div>`;
   const qr = await readQR(lastScamImage);
   if(qr){ $("scamText").value = "QR code : " + qr; analyzeScamText(); return; }
-  if(typeof Tesseract === "undefined"){ result.innerHTML = `<div class="result danger">Le moteur de lecture n'est pas chargé (connexion requise).</div>`; return; }
+  if(typeof Tesseract === "undefined"){ result.innerHTML = `<div class="result danger">Le moteur de lecture n'est pas chargé.</div>`; return; }
   try{
     const out = await Tesseract.recognize(lastScamImage, "fra+eng");
     const text = out.data.text.trim();
@@ -1201,7 +1424,6 @@ function clearScam(){
   lastScamImage = null;
 }
 
-/* ---------- CORRIGÉ : détection d'arnaque améliorée (code SMS, etc.) ---------- */
 function analyzeScamText(){
   const text = $("scamText").value.trim();
   const result = $("scamResult");
@@ -1212,7 +1434,6 @@ function analyzeScamText(){
   const words = ["urgent","urgence","cliquez","cliquer","mot de passe","password","verification","compte bloque","paiement","payer","remboursement","amende","cadeau","gagne","lotterie","loterie","bitcoin","crypto","virement","iban","carte bancaire","credit card","interpol","police","douane","colis","livraison","facture impayee","suspendu","bloque"];
   words.forEach(w => { if(lower.includes(w)){ score += 10; reasons.push("Élément typique d'arnaque : « " + w + " »"); } });
 
-  // Détections renforcées code SMS
   const mentionsCode = /\bcode\b/.test(lower);
   const mentionsSms = /(sms|texto|telephone|mobile|portable)/.test(lower);
   const askGive = /(donner|donne|donnez|communiquer|communique|envoyer|envoie|envoyez|partager|partage|transmettre|transmet|confirmer|valider|saisir|saisissez|inscrire|entrer|entrez|taper|tapez|recopier|recopie)/.test(lower);
@@ -1221,7 +1442,7 @@ function analyzeScamText(){
   if(mentionsCode && askGive){ score += 30; reasons.push("🚨 On vous demande de communiquer un code confidentiel"); }
   if(mentionsCode && mentionsSms && askGive){ score += 25; reasons.push("🚨 ARNAQUE TRÈS PROBABLE : code SMS demandé"); }
 
-  if(/interpol|police|fbi|douane|autorite|justice/i.test(text)){ score += 20; reasons.push("🚨 Usurpation d'autorité (police, douane, Interpol…)"); }
+  if(/interpol|police|fbi|douane|autorite|justice/i.test(text)){ score += 20; reasons.push("🚨 Usurpation d'autorité"); }
   if(/votre compte|votre carte|votre colis|votre amende|votre facture/i.test(text)){ score += 15; reasons.push("Prétexte personnel pour vous faire agir"); }
 
   if(/https?:\/\//i.test(text)){ score += 15; reasons.push("Contient un lien Internet."); }
@@ -1229,7 +1450,6 @@ function analyzeScamText(){
   if(/\+41\s?7\d/.test(text)){ score += 5; reasons.push("Contient un numéro mobile suisse."); }
   if(/[A-Z]{4,}/.test(text)){ score += 5; reasons.push("Utilise beaucoup de majuscules."); }
   if(/!\s*!|!!+/.test(text)){ score += 5; reasons.push("Forte pression visuelle."); }
-  if(/[a-z]\.[a-z]{2,}\/(login|verify|secure|confirm|paiement)/i.test(text)){ score += 20; reasons.push("URL suspecte avec mots-clés de connexion"); }
 
   score = Math.min(100, score);
   const level = score >= 60 ? "Élevé" : score >= 30 ? "Moyen" : "Faible";
@@ -1252,6 +1472,7 @@ function callCheck(){
   $("callResult").innerHTML = n ? `<div class="result danger"><strong>🚨 Probable arnaque (${n} signal/signaux)</strong><br><br>1. Raccrochez maintenant.<br>2. Ne donnez aucun code, ne faites aucun paiement.<br>3. Rappelez vous-même le numéro officiel.<br>4. Si vous avez payé : banque tout de suite, puis police (117).</div>` : "";
 }
 
+/* ============ Règle loyer / Annonce ============ */
 function rentRule(){
   const income = +(appData.money || {}).income || 0;
   const rent = parseFloat($("housingMaxRent").value) || 0;
@@ -1282,7 +1503,7 @@ function checkListing(){
 
 function clearListing(){ $("listingText").value = ""; $("listingResult").innerHTML = ""; }
 
-/* ---------- Vérifié : formule loyer conforme OFL (2,91% par quart, moins 40% inflation) ---------- */
+/* ============ Contrôleur loyer ============ */
 function rentCalc(){
   const rent = parseFloat($("rRent").value), base = parseFloat($("rBase").value), infl = parseFloat($("rInfl").value) || 0;
   if(!(rent > 0)) return null;
@@ -1305,7 +1526,7 @@ function calcRent(){
     Baisse estimée : <strong>${(c.net * 100).toFixed(2)} %</strong><br>
     Loyer net estimé : <strong>${formatCHF(c.newRent)}</strong>/mois<br>
     Économie : <strong>${formatCHF(save)}</strong>/mois, soit <strong>${formatCHF(save * 12)}</strong>/an<br><br>
-    <span class="small">Méthode officielle OFL : environ 2,91 % par quart de point, moins 40 % de l'inflation répercutable. Le bailleur peut aussi invoquer ses frais d'entretien.</span></div>`;
+    <span class="small">Environ 2,91 % par quart de point, moins 40 % de l'inflation répercutable.</span></div>`;
 }
 
 function renderRent(){
@@ -1340,6 +1561,7 @@ function addRateReminder(){
   showToast("Rappel ajouté pour le " + fmtDate(cand));
 }
 
+/* ============ Assurance maladie ============ */
 const HEALTH_STEPS = ["Recevoir ma lettre de nouvelle prime (au plus tard fin octobre)","Comparer les primes sur priminfo.admin.ch","Comparer franchises et modèles d'assurance","Demander l'offre à la nouvelle caisse avant de résilier","Envoyer la résiliation (recommandé) avant la date limite"];
 
 function lastWorkingDayNov(y){
@@ -1402,6 +1624,7 @@ function addHealthReminder(){
   showToast("Rappel ajouté : une semaine avant la date limite");
 }
 
+/* ============ Aujourd'hui ============ */
 function renderToday(){
   const box = $("todayBox"); if(!box) return;
   const tag = (list, src) => (list || []).map(i => ({...i, src}));
@@ -1419,6 +1642,7 @@ function renderToday(){
     ${bal !== null ? `<div class="row">💰 Solde mensuel : <strong>${formatCHF(bal)}</strong></div>` : ""}</div>`;
 }
 
+/* ============ Validation IBAN/AVS/IDE ============ */
 function ibanValid(v){
   const s = v.replace(/\s/g,"").toUpperCase();
   if(!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(s)) return false;
@@ -1457,6 +1681,7 @@ function validateNumber(){
   out.innerHTML = raw ? `<div class="result ${ok ? "success" : "danger"}">${ok ? "✅" : "❌"} ${escapeHtml(note)}</div>` : `<div class="result warning">Saisissez un numéro.</div>`;
 }
 
+/* ============ QR-facture ============ */
 function parseBill(t){
   const L = t.split(/\r?\n/);
   if(L[0] !== "SPC") return null;
@@ -1506,6 +1731,7 @@ async function addBill(){
 
 function clearBill(){ lastBill = null; $("billResult").innerHTML = ""; $("billFile").value = ""; $("billFile2").value = ""; }
 
+/* ============ Lettres types ============ */
 const LETTERS = {
   bail:(f) => `Objet : Résiliation de bail\n\nMadame, Monsieur,\n\nPar la présente, je résilie mon bail concernant le logement situé ${f.addr}, pour le prochain terme contractuel et dans le respect du délai de congé. ${f.detail}\n\nMerci de me confirmer la réception de ce courrier et de convenir d'une date pour l'état des lieux de sortie.`,
   assurance:(f) => `Objet : Résiliation de mon contrat d'assurance\n\nMadame, Monsieur,\n\nPar la présente, je résilie mon contrat d'assurance pour la prochaine échéance possible. ${f.detail}\n\nMerci de me confirmer par écrit la fin du contrat.`,
@@ -1537,9 +1763,9 @@ function makeLetter(){
 
 function copyLetter(){ const text = $("lOut").dataset.raw || ""; if(!text){ showToast("Générez d'abord la lettre"); return; } copyText(text); }
 function printLetter(){ const text = $("lOut").dataset.raw || ""; if(!text){ showToast("Générez d'abord la lettre"); return; } window.print(); }
-function clearLetter(){ ["lName","lAddr","lTo","lDetail"].forEach(id => { $(id).value = ""; }); $("lOut").textContent = ""; $("lOut").dataset.raw = ""; }
+function clearLetter(){ ["lName","lAddr","lTo","lDetail"].forEach(id => { const el = $(id); if(el) el.value = ""; }); $("lOut").textContent = ""; $("lOut").dataset.raw = ""; }
 
-/* ---------- Vérifié : formule LAMal correcte (10% quote-part max 700 CHF/an) ---------- */
+/* ============ Franchise ============ */
 function franchiseCost(prime, f, costs){ const share = costs <= f ? costs : f + Math.min(0.1 * (costs - f), 700); return prime * 12 + share; }
 
 function compareFranchise(){
@@ -1556,9 +1782,9 @@ function compareFranchise(){
     <span class="small">Primes + franchise + quote-part 10 % (max 700 CHF/an).</span></div>`;
 }
 
-function clearFranchise(){ ["pA","pB","fCosts"].forEach(id => { $(id).value = ""; }); $("fA").value = "300"; $("fB").value = "2500"; $("fResult").innerHTML = ""; }
+function clearFranchise(){ ["pA","pB","fCosts"].forEach(id => { const el = $(id); if(el) el.value = ""; }); $("fA").value = "300"; $("fB").value = "2500"; $("fResult").innerHTML = ""; }
 
-/* ---------- Vérifié : brut→net avec taux officiels AVS/AC ---------- */
+/* ============ Brut → net ============ */
 function calcNet(){
   const g = parseFloat($("gross").value);
   const lpp = parseFloat($("lppPct").value) || 0, aanp = parseFloat($("aanpPct").value) || 0;
@@ -1573,6 +1799,7 @@ function calcNet(){
 
 function clearNet(){ $("gross").value = ""; $("lppPct").value = "5"; $("aanpPct").value = "1"; $("netResult").innerHTML = ""; }
 
+/* ============ Parcours de vie ============ */
 const LIFE = {
   move:["🚚 Déménagement",[["Informer La Poste du changement d'adresse",-7],["Informer l'assurance maladie et l'employeur",-7],["Mettre à jour assurance ménage et RC",-14],["État des lieux de sortie",0],["Annoncer l'arrivée à la commune (dans les 14 jours)",14],["Récupérer la caution",30]]],
   birth:["👶 Naissance",[["Informer l'employeur (congé, horaires)",-60],["Annoncer la naissance à l'état civil",3],["Affilier l'enfant à une assurance maladie",30],["Demander les allocations familiales",30],["Mettre à jour assurances et testament",90]]],
@@ -1590,7 +1817,6 @@ function previewLife(){
   $("lifeResult").innerHTML = `<div class="result info"><strong>${LIFE[$("lifeType").value][0]}</strong>${lifeSteps().map(i => `<div class="row">📅 ${fmtDate(i.due)} : ${escapeHtml(i.text.split(" : ")[1])}</div>`).join("")}</div>`;
 }
 
-/* ---------- CORRIGÉ : retour clair si rien à ajouter ---------- */
 function applyLife(){
   const have = appData.documents.map(d => d.text);
   const all = lifeSteps();
@@ -1602,7 +1828,7 @@ function applyLife(){
   }
   add.forEach(i => appData.documents.push({text:i.text, done:false, due:i.due}));
   saveData(); renderList("documents"); renderToday();
-  $("lifeResult").innerHTML = `<div class="result success">✅ ${add.length} étape(s) ajoutée(s) dans « Documents ».<br><span class="small">Ouvrez le module Documents pour les voir.</span></div>`;
+  $("lifeResult").innerHTML = `<div class="result success">✅ ${add.length} étape(s) ajoutée(s) dans « Documents ».</div>`;
   showToast(add.length + " étape(s) ajoutée(s)");
 }
 
@@ -1618,6 +1844,7 @@ async function removeLife(){
 
 function clearLife(){ $("lifeType").selectedIndex = 0; $("lifeDate").value = ""; $("lifeResult").innerHTML = ""; }
 
+/* ============ Calendrier ============ */
 const SWISS_DATES = [["🏥 Assurance maladie : résiliation au plus tard le dernier jour ouvrable de novembre",11,30],["💼 3e pilier A : dernier versement de l'année",12,31],["🧾 Déclaration d'impôts (souvent, selon le canton)",3,31]];
 
 function nextDate(m, d){
@@ -1708,6 +1935,7 @@ async function clearCalendar(){
   showToast("Échéances effacées");
 }
 
+/* ============ QR Shield ============ */
 const OFFICIAL = ["post.ch","swisscom.ch","postfinance.ch","sbb.ch","twint.ch","admin.ch","ch.ch","ubs.com","raiffeisen.ch","zkb.ch","migros.ch","coop.ch","sunrise.ch","salt.ch","localsearch.ch","local.ch","search.ch","ncsc.admin.ch","antiphishing.ch"];
 const SHORTENERS = ["bit.ly","tinyurl.com","t.co","goo.gl","is.gd","cutt.ly","rb.gy","ow.ly","shorturl.at"];
 const BAD_TLD = ["xyz","top","click","icu","live","buzz","cyou","cfd","sbs","rest"];
@@ -1804,6 +2032,7 @@ function handleQrShield(e){
 function clearQr(){ lastQr = null; $("qrUrl").value = ""; $("qrResult").innerHTML = ""; }
 function clearValidator(){ $("vInput").value = ""; $("vResult").innerHTML = ""; }
 
+/* ============ Paramètres ============ */
 function restoreApp(){
   appData = loadData(); ensureData(); renderAll();
   $("settingsResult").innerHTML = `<div class="result success">↩️ Les données enregistrées ont été rechargées.</div>`;
@@ -1821,6 +2050,7 @@ async function clearAllData(){
   showToast("Données effacées");
 }
 
+/* ============ Modale ============ */
 let modalPrevFocus = null;
 
 function uiForm(title, fields, ok = "OK"){
@@ -1858,12 +2088,14 @@ function uiForm(title, fields, ok = "OK"){
 
 function uiConfirm(msg, ok = "Confirmer"){ return uiForm("Confirmation", [{text:msg}], ok).then(v => v !== null); }
 
+/* ============ Rendu global ============ */
 function renderAll(){
   refreshFavorites(); renderMoney(); renderHousing();
   renderList("family"); renderList("documents"); renderList("applications");
   renderNumbers(); renderHealth(); renderRent(); renderToday();
 }
 
+/* ============ Bouton retour haut + démarrage ============ */
 function scrollToTop(){ window.scrollTo({top:0,behavior:"smooth"}); }
 function updateBackToTop(){ const b = document.getElementById("backToTop"); if(!b) return; if(window.scrollY > 400) b.classList.add("show"); else b.classList.remove("show"); }
 window.addEventListener("scroll", updateBackToTop, {passive:true});
@@ -1880,11 +2112,8 @@ document.addEventListener("DOMContentLoaded", () => {
   ensureData();
   renderAll();
   updateBottomNav("home");
-    updateBackToTop();
+  updateBackToTop();
 });
 </script>
 </body>
 </html>
-
-    
-    
