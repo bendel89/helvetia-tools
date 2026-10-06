@@ -287,7 +287,7 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
   </div>
   <div class="section">
     <div class="section-title">🏛️ Estimation d'impôts (simplifiée)</div>
-    <p class="small" style="margin-bottom:8px">Estimation très approximative. Votre vrai impôt dépend de votre situation complète.</p>
+    <p class="small" style="margin-bottom:8px">Estimation très approximative basée sur les barèmes 2024. Votre vrai impôt dépend de votre situation complète.</p>
     <div class="form-grid">
       <div class="field"><label for="taxCanton">Canton</label>
         <select id="taxCanton"><option value="VD">Vaud (VD)</option><option value="GE">Genève (GE)</option><option value="VS">Valais (VS)</option><option value="FR">Fribourg (FR)</option><option value="NE">Neuchâtel (NE)</option><option value="JU">Jura (JU)</option><option value="BE">Berne (BE)</option><option value="ZH">Zurich (ZH)</option><option value="TI">Tessin (TI)</option></select></div>
@@ -612,6 +612,7 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.0/dist/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
 <script>
@@ -729,7 +730,7 @@ function showToast(msg){
   clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 2500);
 }
 
-/* ============ NOUVEAU : Partage natif ============ */
+/* ============ Partage natif ============ */
 async function shareText(title, text){
   if(navigator.share){
     try{ await navigator.share({title, text}); return true; }
@@ -757,7 +758,7 @@ function shareApp(){
   shareText("Helvetia-Tools", "Découvrez Helvetia-Tools, l'assistant suisse pour les démarches du quotidien :\n" + url);
 }
 
-/* ============ NOUVEAU : Dictée vocale ============ */
+/* ============ Dictée vocale ============ */
 function startDictation(targetId, btn){
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if(!SR){ showToast("Dictée non supportée sur ce navigateur"); return; }
@@ -790,22 +791,37 @@ function startDictation(targetId, btn){
   try{ rec.start(); }catch(e){ showToast("Impossible de démarrer"); activeRecognition = null; }
 }
 
-/* ============ NOUVEAU : PDF lettre ============ */
+/* ============ PDF lettre (jsPDF — vrai PDF) ============ */
 function downloadLetterPDF(){
   const text = $("lOut").dataset.raw || "";
   if(!text){ showToast("Générez d'abord la lettre"); return; }
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Lettre</title>
-    <style>@page{margin:2cm}body{font-family:Georgia,serif;font-size:15px;line-height:1.7;color:#000;white-space:pre-wrap;padding:0;margin:0}</style>
-    </head><body>${escapeHtml(text)}</body></html>`;
-  const w = window.open("", "_blank");
-  if(!w){ showToast("Autorisez les pop-ups pour exporter"); return; }
-  w.document.write(html);
-  w.document.close();
-  setTimeout(() => { try{ w.focus(); w.print(); }catch(e){} }, 500);
-  showToast("Dans la fenêtre → Enregistrer en PDF");
+  if(!window.jspdf || !window.jspdf.jsPDF){ showToast("Librairie PDF non chargée"); return; }
+  try{
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({unit:"mm", format:"a4"});
+    doc.setFont("times", "normal");
+    doc.setFontSize(11);
+    const margin = 20;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const maxWidth = pageWidth - 2 * margin;
+    const lines = doc.splitTextToSize(text, maxWidth);
+    let y = margin;
+    const lineHeight = 5.5;
+    for(const line of lines){
+      if(y > pageHeight - margin){ doc.addPage(); y = margin; }
+      doc.text(line, margin, y);
+      y += lineHeight;
+    }
+    doc.save("lettre-helvetia-tools.pdf");
+    showToast("✅ PDF enregistré dans Téléchargements");
+  }catch(e){
+    console.error("PDF error:", e);
+    showToast("Erreur PDF : " + (e.message || "inconnue"));
+  }
 }
 
-/* ============ NOUVEAU : Télécharger données JSON ============ */
+/* ============ Télécharger données JSON ============ */
 function downloadData(){
   try{
     const blob = new Blob([JSON.stringify(appData, null, 2)], {type:"application/json"});
@@ -819,7 +835,10 @@ function downloadData(){
   }catch(e){ showToast("Téléchargement impossible"); }
 }
 
-/* ============ NOUVEAU : Calcul impôts simplifié ============ */
+/* ============ CORRIGÉ : Calcul impôts (taux réalistes 2024) ============ */
+/* Barèmes progressifs par tranche (impôt total cantonal + communal + IFD)
+   Valeurs indicatives : célibataire, sans enfants, fortune nulle.
+   Pour mariés : tranches x2.                              */
 function calcTaxes(){
   const canton = $("taxCanton").value;
   const situation = $("taxMarital").value;
@@ -828,57 +847,61 @@ function calcTaxes(){
   const out = $("taxResult");
   if(income <= 0){ out.innerHTML = `<div class="result warning">Saisissez un revenu annuel.</div>`; return; }
   const base = Math.max(0, income - ded);
-  // Taux marginaux approximatifs (impôt fédéral + cantonal + communal, personne seule ou couple)
-  const rates = {
-    VD:{single:[[0,.0],[15000,.05],[30000,.10],[50000,.15],[80000,.20],[120000,.25],[200000,.30]], married:[[0,.0],[30000,.05],[60000,.10],[90000,.15],[130000,.20],[180000,.25],[250000,.30]]},
-    GE:{single:[[0,.0],[18000,.05],[35000,.11],[60000,.16],[90000,.21],[150000,.26],[250000,.31]], married:[[0,.0],[35000,.05],[65000,.11],[100000,.16],[150000,.21],[220000,.26],[320000,.31]]},
-    VS:{single:[[0,.0],[14000,.05],[28000,.10],[45000,.14],[70000,.18],[110000,.22],[180000,.26]], married:[[0,.0],[28000,.05],[55000,.10],[85000,.14],[120000,.18],[170000,.22],[240000,.26]]},
-    FR:{single:[[0,.0],[15000,.05],[30000,.10],[50000,.14],[75000,.18],[120000,.22],[190000,.26]], married:[[0,.0],[30000,.05],[60000,.10],[90000,.14],[130000,.18],[180000,.22],[260000,.26]]},
-    NE:{single:[[0,.0],[15000,.05],[30000,.11],[50000,.16],[80000,.21],[130000,.25],[200000,.29]], married:[[0,.0],[30000,.05],[60000,.11],[90000,.16],[130000,.21],[190000,.25],[280000,.29]]},
-    JU:{single:[[0,.0],[14000,.05],[28000,.10],[45000,.15],[70000,.19],[110000,.23],[180000,.27]], married:[[0,.0],[28000,.05],[55000,.10],[85000,.15],[120000,.19],[170000,.23],[250000,.27]]},
-    BE:{single:[[0,.0],[15000,.05],[30000,.10],[50000,.14],[75000,.18],[120000,.22],[190000,.26]], married:[[0,.0],[30000,.05],[60000,.10],[90000,.14],[130000,.18],[180000,.22],[260000,.26]]},
-    ZH:{single:[[0,.0],[14000,.05],[28000,.09],[50000,.13],[80000,.17],[130000,.21],[200000,.25]], married:[[0,.0],[28000,.05],[56000,.09],[90000,.13],[130000,.17],[190000,.21],[280000,.25]]},
-    TI:{single:[[0,.0],[15000,.05],[30000,.10],[50000,.15],[80000,.19],[130000,.23],[200000,.27]], married:[[0,.0],[30000,.05],[60000,.10],[90000,.15],[130000,.19],[190000,.23],[280000,.27]]}
+
+  // Tranches [seuil, taux] pour célibataire — taux cumulés réalistes 2024
+  const bracketsSingle = {
+    VD:[[0,.00],[15000,.06],[30000,.13],[50000,.18],[80000,.23],[120000,.27],[200000,.30],[400000,.32]],
+    GE:[[0,.00],[18000,.07],[35000,.14],[60000,.19],[90000,.23],[150000,.27],[250000,.30],[500000,.32]],
+    VS:[[0,.00],[14000,.05],[28000,.11],[45000,.16],[70000,.20],[110000,.24],[180000,.27],[400000,.29]],
+    FR:[[0,.00],[15000,.06],[30000,.12],[50000,.17],[75000,.21],[120000,.24],[190000,.27],[400000,.29]],
+    NE:[[0,.00],[15000,.07],[30000,.14],[50000,.19],[80000,.23],[130000,.26],[200000,.28],[400000,.30]],
+    JU:[[0,.00],[14000,.06],[28000,.12],[45000,.17],[70000,.21],[110000,.24],[180000,.27],[400000,.29]],
+    BE:[[0,.00],[15000,.06],[30000,.12],[50000,.17],[75000,.21],[120000,.24],[190000,.26],[400000,.28]],
+    ZH:[[0,.00],[14000,.05],[28000,.10],[50000,.14],[80000,.18],[130000,.22],[200000,.25],[400000,.27]],
+    TI:[[0,.00],[15000,.06],[30000,.12],[50000,.17],[80000,.21],[130000,.24],[200000,.27],[400000,.29]]
   };
-  const table = (rates[canton] || rates.VD)[situation];
+  const table = bracketsSingle[canton] || bracketsSingle.VD;
+  const mult = situation === "married" ? 2 : 1;
+
+  // Calcul progressif par tranche
   let tax = 0;
   for(let i = 0; i < table.length; i++){
     const [threshold, rate] = table[i];
-    const next = (table[i+1] && table[i+1][0]) || base;
-    if(base > threshold){
-      const slice = Math.min(base, next) - threshold;
+    const s = threshold * mult;
+    const nextS = (table[i+1] ? table[i+1][0] : base + 1) * mult;
+    if(base > s){
+      const slice = Math.min(base, nextS) - s;
       tax += slice * rate;
     }
   }
-  const eff = (tax / income * 100).toFixed(1);
+  // Abattement mariés (~10%)
+  if(situation === "married") tax *= 0.90;
+
+  const eff = income > 0 ? (tax / income * 100).toFixed(1) : 0;
   out.innerHTML = `<div class="result info"><strong>🏛️ Estimation d'impôt — ${escapeHtml(canton)}</strong><br><br>
     Revenu imposable : <strong>${formatCHF(base)}</strong><br>
     Impôt annuel estimé : <strong>${formatCHF(tax)}</strong><br>
     Taux effectif : <strong>${eff} %</strong><br><br>
-    <span class="small">⚠️ Estimation très approximative. Votre vrai impôt dépend de votre fortune, enfants, transports, etc. Consultez l'administration fiscale de votre canton.</span></div>`;
+    <span class="small">⚠️ Estimation indicative basée sur barèmes 2024 (personne sans fortune). Votre vrai impôt dépend de votre fortune, enfants, frais de transport, cotisations LPP/3e pilier, etc. Consultez l'administration fiscale de votre canton.</span></div>`;
 }
 function clearTaxes(){
   ["taxIncome","taxDeductions"].forEach(id => { const el = $(id); if(el) el.value = ""; });
   $("taxResult").innerHTML = "";
 }
 
-/* ============ NOUVEAU : Comparateur primes LAMal ============ */
+/* ============ Comparateur primes LAMal ============ */
 function calcPrimeRange(){
   const age = $("pAge").value;
   const canton = $("pCanton").value;
   const model = $("pModel").value;
   const franchise = +$("pFranchise").value;
   const out = $("pPrimeResult");
-  // Base moyenne adulte 2025 selon canton (CHF/mois)
   const baseByCanton = {VD:450, GE:520, VS:400, FR:410, NE:480, JU:450, BE:420, ZH:400, TI:440};
   let base = baseByCanton[canton] || 430;
-  // Âge
   if(age === "young") base *= 0.65;
   if(age === "senior") base *= 1.25;
-  // Modèle
   const modelAdj = {standard:1, family:0.95, telmed:0.92, hmo:0.88};
   base *= modelAdj[model] || 1;
-  // Franchise (approx : plus la franchise est haute, plus la prime baisse)
   const franchiseAdj = {300:1.15, 500:1.10, 1000:1.05, 1500:1.00, 2000:0.95, 2500:0.90};
   base *= franchiseAdj[franchise] || 1;
   const low = base * 0.75;
@@ -919,7 +942,6 @@ function ensureData(){
 
 function saveData(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(appData)); }catch(e){ console.error(e); } }
 
-/* ============ Construction interface ============ */
 function buildUI(){
   $("homeGrid").innerHTML = Object.entries(MODULES).map(([k,m]) => `
     <div class="card">
