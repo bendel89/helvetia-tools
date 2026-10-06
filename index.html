@@ -791,37 +791,14 @@ function startDictation(targetId, btn){
   try{ rec.start(); }catch(e){ showToast("Impossible de démarrer"); activeRecognition = null; }
 }
 
-/* ============ PDF lettre (jsPDF — corrigé pour retirer les emojis) ============ */
+/* ============ PDF lettre (fonctionne, emojis retirés) ============ */
 function downloadLetterPDF(){
   let text = $("lOut").dataset.raw || "";
   if(!text){ showToast("Générez d'abord la lettre"); return; }
   if(!window.jspdf || !window.jspdf.jsPDF){ showToast("Librairie PDF non chargée"); return; }
-  // Retirer les emojis (jsPDF standard ne les gère pas)
-  try{
-    text = text
-      .replace(/📮/g, "->")
-      .replace(/📌/g, "-")
-      .replace(/\uFE0F/g, "")
-      .replace(/[\u{1F300}-\u{1F5FF}]/gu, "")
-      .replace(/[\u{1F600}-\u{1F64F}]/gu, "")
-      .replace(/[\u{1F680}-\u{1F6FF}]/gu, "")
-      .replace(/[\u{1F700}-\u{1F77F}]/gu, "")
-      .replace(/[\u{1F780}-\u{1F7FF}]/gu, "")
-      .replace(/[\u{1F800}-\u{1F8FF}]/gu, "")
-      .replace(/[\u{1F900}-\u{1F9FF}]/gu, "")
-      .replace(/[\u{1FA00}-\u{1FAFF}]/gu, "")
-      .replace(/[\u{2600}-\u{26FF}]/gu, "")
-      .replace(/[\u{2700}-\u{27BF}]/gu, "")
-      .replace(/[\u{1F1E6}-\u{1F1FF}]/gu, "")
-      .replace(/[\u{2B00}-\u{2BFF}]/gu, "")
-      .replace(/[\u{2190}-\u{21FF}]/gu, m => m === "→" ? "->" : "")
-      .replace(/[ \t]+\n/g, "\n")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim();
-  }catch(e){
-    // Si les regex échouent, on utilise la méthode simple de secours
-    text = text.replace(/[^\x00-\x7F\u00C0-\u024F\u2018\u2019\u201C\u201D\u2013\u2014\u2026\n\r\t ]/g, "");
-  }
+  // Filtrer les caractères non supportés (emojis, symboles)
+  // Garde : ASCII, latin-1, latin étendu, guillemets courbes, tirets, points de suspension, sauts de ligne
+  text = text.replace(/[^\x20-\x7E\u00A0-\u017F\u2018\u2019\u201C\u201D\u2013\u2014\u2026\n\r]/g, "");
   try{
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({unit:"mm", format:"a4"});
@@ -861,9 +838,7 @@ function downloadData(){
   }catch(e){ showToast("Téléchargement impossible"); }
 }
 
-/* ============ CORRIGÉ : Calcul impôts (barèmes réajustés 2024) ============ */
-/* Barèmes progressifs par tranche (impôt cantonal + communal + IFD).
-   Valeurs indicatives pour célibataire sans enfant, fortune nulle.        */
+/* ============ Calcul impôts (barèmes réajustés 2024 — plus réalistes) ============ */
 function calcTaxes(){
   const canton = $("taxCanton").value;
   const situation = $("taxMarital").value;
@@ -873,17 +848,18 @@ function calcTaxes(){
   if(income <= 0){ out.innerHTML = `<div class="result warning">Saisissez un revenu annuel.</div>`; return; }
   const base = Math.max(0, income - ded);
 
-  // Barèmes progressifs réajustés pour approcher la réalité 2024
+  // Barèmes progressifs réajustés (impôt total cantonal + communal + IFD)
+  // Référence : célibataire sans enfant, sans fortune
   const bracketsSingle = {
-    VD:[[0,.00],[12000,.04],[25000,.10],[40000,.15],[60000,.20],[90000,.24],[130000,.28],[200000,.31],[400000,.33]],
-    GE:[[0,.00],[15000,.05],[30000,.11],[50000,.16],[75000,.20],[120000,.24],[200000,.28],[400000,.31]],
-    VS:[[0,.00],[12000,.03],[25000,.08],[40000,.13],[60000,.17],[90000,.21],[150000,.25],[400000,.28]],
-    FR:[[0,.00],[12000,.04],[25000,.09],[40000,.14],[60000,.18],[90000,.22],[150000,.25],[400000,.28]],
-    NE:[[0,.00],[12000,.05],[25000,.11],[40000,.16],[60000,.20],[100000,.24],[160000,.27],[400000,.30]],
-    JU:[[0,.00],[12000,.04],[25000,.10],[40000,.15],[60000,.19],[95000,.23],[150000,.26],[400000,.29]],
-    BE:[[0,.00],[12000,.04],[25000,.10],[40000,.15],[60000,.19],[90000,.23],[150000,.26],[400000,.28]],
-    ZH:[[0,.00],[10000,.03],[22000,.07],[40000,.11],[60000,.15],[90000,.19],[150000,.23],[400000,.26]],
-    TI:[[0,.00],[12000,.04],[25000,.10],[40000,.15],[60000,.19],[100000,.23],[160000,.26],[400000,.29]]
+    VD:[[0,.00],[15000,.08],[30000,.15],[50000,.19],[70000,.23],[90000,.26],[120000,.28],[160000,.30],[250000,.32]],
+    GE:[[0,.00],[18000,.09],[35000,.16],[55000,.20],[75000,.24],[95000,.27],[125000,.29],[165000,.31],[250000,.33]],
+    VS:[[0,.00],[14000,.07],[28000,.13],[45000,.17],[65000,.21],[85000,.24],[110000,.26],[150000,.28],[250000,.30]],
+    FR:[[0,.00],[14000,.07],[28000,.13],[45000,.17],[65000,.21],[85000,.24],[110000,.26],[150000,.28],[250000,.30]],
+    NE:[[0,.00],[15000,.08],[30000,.15],[50000,.19],[70000,.23],[90000,.26],[120000,.28],[160000,.30],[250000,.32]],
+    JU:[[0,.00],[14000,.07],[28000,.13],[45000,.17],[65000,.21],[85000,.24],[110000,.26],[150000,.28],[250000,.30]],
+    BE:[[0,.00],[14000,.07],[28000,.13],[45000,.17],[65000,.21],[85000,.24],[110000,.26],[150000,.28],[250000,.30]],
+    ZH:[[0,.00],[12000,.06],[25000,.12],[42000,.16],[60000,.19],[80000,.22],[105000,.24],[145000,.26],[250000,.29]],
+    TI:[[0,.00],[15000,.08],[30000,.14],[48000,.18],[68000,.22],[88000,.25],[115000,.27],[155000,.29],[250000,.31]]
   };
   const table = bracketsSingle[canton] || bracketsSingle.VD;
   const mult = situation === "married" ? 2 : 1;
