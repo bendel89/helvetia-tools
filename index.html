@@ -854,8 +854,8 @@ function initOneSignal(){
       await OneSignal.init({
         appId: ONESIGNAL_APP_ID,
         allowLocalhostAsSecureOrigin: true,
-        serviceWorkerParam: { scope: "/helvetia-tools/" },
-        serviceWorkerPath: "/helvetia-tools/OneSignalSDKWorker.js",
+        serviceWorkerParam: { scope: "/" },
+        serviceWorkerPath: "/OneSignalSDKWorker.js",
         notifyButton: { enable: false },
         welcomeNotification: {
           title: "Helvetia-Tools",
