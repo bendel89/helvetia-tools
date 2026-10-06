@@ -115,6 +115,11 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
 .mic-btn{background:#f0f4f8;color:#333;border:1px solid var(--border);padding:8px 12px;border-radius:9px;font-size:13px;font-weight:600;margin-top:6px}
 .mic-btn.recording{background:#ffe4e4;color:#b51218;animation:pulse 1s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.cloud-status{display:flex;align-items:center;gap:8px;padding:12px;border-radius:12px;background:#f5f7f9;margin-bottom:10px;font-size:13px}
+.cloud-status .dot{width:10px;height:10px;border-radius:50%;background:#bbb;flex-shrink:0}
+.cloud-status.online .dot{background:#16834b}
+.cloud-status.offline .dot{background:#b51218}
+.cloud-status .email{font-weight:700;color:var(--text);word-break:break-all}
 @media(max-width:700px){.letter-preview{padding:22px 20px;font-size:14px}.form-grid,.tool-grid{grid-template-columns:1fr}.panel-header h2{font-size:17px}}
 @media(max-width:430px){.card{min-height:125px;padding:14px}.card-icon{font-size:27px}.card h3{font-size:15px}.card p{font-size:12px}.favorite-panel-btn{font-size:11px;padding:7px 8px}}
 @media print{body *{visibility:hidden}.letter-preview,.letter-preview *{visibility:visible}.letter-preview{position:absolute;left:0;top:0;width:100%;border:0;box-shadow:none;padding:0;margin:0}.back-to-top{display:none}}
@@ -569,9 +574,35 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
 </div></section>
 
 <section id="panel-settings" class="panel" data-title="⚙️ Paramètres"><div class="panel-body">
+
+  <!-- ============ NOUVEAU : Synchronisation Cloud ============ -->
+  <div class="section">
+    <div class="section-title">☁️ Synchronisation Cloud</div>
+    <p class="small" style="margin-bottom:10px">Retrouvez vos données sur tous vos appareils (iPhone, iPad, ordinateur).</p>
+
+    <div id="cloudStatus" class="cloud-status offline">
+      <span class="dot"></span>
+      <span id="cloudStatusText">Non connecté</span>
+    </div>
+
+    <div id="cloudLoggedOut" class="btn-row">
+      <button type="button" class="btn primary" onclick="openCloudLogin()">🔑 Se connecter</button>
+    </div>
+
+    <div id="cloudLoggedIn" class="hidden">
+      <div class="btn-row">
+        <button type="button" class="btn green" onclick="syncNow()">🔄 Synchroniser maintenant</button>
+        <button type="button" class="btn danger" onclick="cloudLogout()">🚪 Se déconnecter</button>
+      </div>
+      <p class="small" style="margin-top:10px">La synchronisation est automatique à chaque modification.</p>
+    </div>
+
+    <div id="cloudMessage" aria-live="polite"></div>
+  </div>
+
   <div class="section">
     <div class="section-title">💾 Données locales</div>
-    <p class="small">Les informations saisies sont enregistrées uniquement dans votre navigateur.</p>
+    <p class="small">Les informations saisies sont enregistrées dans votre navigateur et, si connecté, dans le cloud.</p>
     <div class="btn-row">
       <button type="button" class="btn danger" onclick="restoreApp()">↩️ Restaurer</button>
       <button type="button" class="btn" onclick="exportData()">📋 Copier mes données</button>
@@ -612,12 +643,52 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
   </div>
 </div>
 
+<!-- Firebase SDK (compat) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+<!-- Librairies existantes -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.0/dist/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
 <script>
 "use strict";
 
+/* ============================================================
+   CONFIGURATION FIREBASE
+   ============================================================ */
+const firebaseConfig = {
+  apiKey: "AIzaSyCVN3jsDqQAAaniP9IXurWXSnsX0Xk3aWE",
+  authDomain: "helvetia-tools.firebaseapp.com",
+  projectId: "helvetia-tools",
+  storageBucket: "helvetia-tools.firebasestorage.app",
+  messagingSenderId: "125008868109",
+  appId: "1:125008868109:web:4687d2b05b94701ecf7644"
+};
+
+let fbApp = null, fbAuth = null, fbDb = null;
+let currentUser = null;
+let firestoreUnsubscribe = null;
+let syncInProgress = false;
+let lastLocalSave = 0;
+
+try {
+  if(typeof firebase !== "undefined"){
+    fbApp = firebase.initializeApp(firebaseConfig);
+    fbAuth = firebase.auth();
+    fbDb = firebase.firestore();
+    fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(e => console.warn("Persistance:", e));
+  } else {
+    console.warn("Firebase SDK non chargé");
+  }
+}catch(e){
+  console.error("Firebase init échoué:", e);
+}
+
+/* ============================================================
+   Helvetia-Tools — JavaScript (base)
+   ============================================================ */
 const $ = id => document.getElementById(id);
 const STORAGE_KEY = "helvetiaTools_v1";
 const OLD_KEYS = ["swissLifeAI_v8", "swissLifeAI_v7"];
@@ -730,7 +801,241 @@ function showToast(msg){
   clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 2500);
 }
 
-/* ============ Partage natif ============ */
+/* ============================================================
+   FIREBASE CLOUD SYNC
+   ============================================================ */
+
+function cloudStatus(state, text){
+  const box = $("cloudStatus");
+  const txt = $("cloudStatusText");
+  if(!box || !txt) return;
+  box.classList.remove("online", "offline");
+  box.classList.add(state);
+  txt.textContent = text;
+}
+
+function showCloudMessage(msg, type = "info"){
+  const box = $("cloudMessage");
+  if(!box) return;
+  box.innerHTML = `<div class="result ${type}">${escapeHtml(msg)}</div>`;
+  setTimeout(() => { if(box.innerHTML.includes(msg)) box.innerHTML = ""; }, 5000);
+}
+
+async function cloudSyncPush(){
+  if(!currentUser || !fbDb || syncInProgress) return;
+  try{
+    syncInProgress = true;
+    await fbDb.collection("users").doc(currentUser.uid).set({
+      data: JSON.stringify(appData),
+      lastUpdate: firebase.firestore.FieldValue.serverTimestamp(),
+      email: currentUser.email || "",
+      updatedAt: Date.now()
+    }, {merge:true});
+  }catch(e){
+    console.error("Erreur push cloud:", e);
+  }finally{
+    syncInProgress = false;
+  }
+}
+
+async function cloudSyncPull(){
+  if(!currentUser || !fbDb) return;
+  try{
+    const doc = await fbDb.collection("users").doc(currentUser.uid).get();
+    if(doc.exists){
+      const payload = doc.data();
+      if(payload && payload.data){
+        const remote = JSON.parse(payload.data);
+        if(remote && typeof remote === "object"){
+          // Fusion : on garde les données distantes si elles existent, sinon on garde les locales
+          appData = Object.assign(cloneDefault(), remote);
+          ensureData();
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+          renderAll();
+          return true;
+        }
+      }
+    } else {
+      // Premier login : on upload les données locales
+      await cloudSyncPush();
+    }
+  }catch(e){
+    console.error("Erreur pull cloud:", e);
+    throw e;
+  }
+  return false;
+}
+
+function startFirestoreListener(){
+  if(!currentUser || !fbDb) return;
+  if(firestoreUnsubscribe) firestoreUnsubscribe();
+  firestoreUnsubscribe = fbDb.collection("users").doc(currentUser.uid).onSnapshot(doc => {
+    if(!doc.exists) return;
+    const payload = doc.data();
+    if(!payload || !payload.data) return;
+    // Ignore si c'est nous qui venons de push
+    if(syncInProgress) return;
+    if(payload.updatedAt && Date.now() - payload.updatedAt < 3000) return;
+    try{
+      const remote = JSON.parse(payload.data);
+      if(remote && typeof remote === "object"){
+        appData = Object.assign(cloneDefault(), remote);
+        ensureData();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+        renderAll();
+        showToast("☁️ Mise à jour reçue du cloud");
+      }
+    }catch(e){ console.warn("Erreur listener:", e); }
+  }, err => console.warn("Listener firestore:", err));
+}
+
+async function syncNow(){
+  if(!currentUser){ showToast("Connectez-vous d'abord"); return; }
+  showToast("⏳ Synchronisation...");
+  await cloudSyncPush();
+  showToast("✅ Synchronisé");
+}
+
+function updateCloudUI(){
+  const status = $("cloudStatus");
+  const loggedOut = $("cloudLoggedOut");
+  const loggedIn = $("cloudLoggedIn");
+  if(!status || !loggedOut || !loggedIn) return;
+
+  if(currentUser){
+    cloudStatus("online", "Connecté · " + (currentUser.email || currentUser.displayName || "Utilisateur"));
+    loggedOut.classList.add("hidden");
+    loggedIn.classList.remove("hidden");
+  } else {
+    cloudStatus("offline", "Non connecté");
+    loggedOut.classList.remove("hidden");
+    loggedIn.classList.add("hidden");
+  }
+}
+
+function openCloudLogin(){
+  // Ouvre une modale de connexion
+  const body = $("modalBody");
+  $("modalTitle").textContent = "🔑 Connexion Cloud";
+  body.innerHTML = `
+    <p class="small" style="margin-bottom:10px">Connectez-vous pour synchroniser vos données entre appareils.</p>
+    <div class="btn-row" style="margin-bottom:14px">
+      <button type="button" class="btn" style="background:#fff;border:1px solid var(--border);color:#222;width:100%" onclick="cloudLoginGoogle()">🔵 Continuer avec Google</button>
+    </div>
+    <p class="small" style="text-align:center;margin:10px 0">ou</p>
+    <div class="field" style="margin-bottom:8px">
+      <label for="cloudEmail">Adresse e-mail</label>
+      <input id="cloudEmail" type="email" placeholder="votre@email.ch" autocomplete="email">
+    </div>
+    <div class="field" style="margin-bottom:8px">
+      <label for="cloudPassword">Mot de passe (min. 6 caractères)</label>
+      <input id="cloudPassword" type="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <div class="btn-row">
+      <button type="button" class="btn primary" onclick="cloudLoginEmail()">🔓 Se connecter</button>
+      <button type="button" class="btn green" onclick="cloudRegisterEmail()">✨ Créer un compte</button>
+    </div>
+    <div id="cloudLoginMsg"></div>
+  `;
+  $("modalOk").style.display = "none";
+  $("modalCancel").textContent = "Fermer";
+  $("modalCancel").onclick = () => { $("modal").classList.add("hidden"); $("modalOk").style.display = ""; };
+  $("modal").classList.remove("hidden");
+}
+
+function cloudLoginMsg(msg, type = "info"){
+  const m = $("cloudLoginMsg");
+  if(!m) return;
+  m.innerHTML = `<div class="result ${type}">${escapeHtml(msg)}</div>`;
+}
+
+async function cloudLoginEmail(){
+  if(!fbAuth){ showToast("Firebase non chargé"); return; }
+  const email = $("cloudEmail").value.trim();
+  const password = $("cloudPassword").value;
+  if(!email || !password){ cloudLoginMsg("Email et mot de passe requis", "warning"); return; }
+  try{
+    cloudLoginMsg("⏳ Connexion...", "info");
+    await fbAuth.signInWithEmailAndPassword(email, password);
+  }catch(e){
+    cloudLoginMsg("❌ " + (e.message || "Erreur de connexion"), "danger");
+  }
+}
+
+async function cloudRegisterEmail(){
+  if(!fbAuth){ showToast("Firebase non chargé"); return; }
+  const email = $("cloudEmail").value.trim();
+  const password = $("cloudPassword").value;
+  if(!email || !password){ cloudLoginMsg("Email et mot de passe requis", "warning"); return; }
+  if(password.length < 6){ cloudLoginMsg("Mot de passe : 6 caractères minimum", "warning"); return; }
+  try{
+    cloudLoginMsg("⏳ Création du compte...", "info");
+    await fbAuth.createUserWithEmailAndPassword(email, password);
+  }catch(e){
+    let msg = e.message || "Erreur";
+    if(e.code === "auth/email-already-in-use") msg = "Cet email est déjà utilisé. Essayez de vous connecter.";
+    cloudLoginMsg("❌ " + msg, "danger");
+  }
+}
+
+async function cloudLoginGoogle(){
+  if(!fbAuth){ showToast("Firebase non chargé"); return; }
+  try{
+    const provider = new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({prompt: "select_account"});
+    await fbAuth.signInWithPopup(provider);
+  }catch(e){
+    console.warn("Google login:", e);
+    if(e.code === "auth/popup-blocked" || e.code === "auth/operation-not-supported-in-this-environment"){
+      try{
+        await fbAuth.signInWithRedirect(new firebase.auth.GoogleAuthProvider());
+      }catch(e2){
+        cloudLoginMsg("❌ Connexion Google impossible. Utilisez l'email.", "danger");
+      }
+    } else {
+      cloudLoginMsg("❌ " + (e.message || "Erreur Google"), "danger");
+    }
+  }
+}
+
+async function cloudLogout(){
+  if(!fbAuth) return;
+  if(!await uiConfirm("Se déconnecter du cloud ? Vos données locales restent sur cet appareil.", "Se déconnecter")) return;
+  try{
+    if(firestoreUnsubscribe){ firestoreUnsubscribe(); firestoreUnsubscribe = null; }
+    await fbAuth.signOut();
+    showToast("Déconnecté du cloud");
+  }catch(e){
+    showToast("Erreur déconnexion");
+  }
+}
+
+function initFirebaseAuth(){
+  if(!fbAuth) return;
+  fbAuth.onAuthStateChanged(async user => {
+    currentUser = user;
+    updateCloudUI();
+    if(user){
+      showCloudMessage("✅ Connecté · Synchronisation en cours...", "success");
+      $("modal").classList.add("hidden");
+      $("modalOk").style.display = "";
+      try{
+        await cloudSyncPull();
+        startFirestoreListener();
+        showCloudMessage("☁️ Synchronisé avec le cloud", "success");
+      }catch(e){
+        showCloudMessage("⚠️ Synchronisation impossible pour l'instant", "warning");
+      }
+    } else {
+      showCloudMessage("Déconnecté. Données locales uniquement.", "info");
+      if(firestoreUnsubscribe){ firestoreUnsubscribe(); firestoreUnsubscribe = null; }
+    }
+  });
+}
+
+/* ============================================================
+   Partage natif
+   ============================================================ */
 async function shareText(title, text){
   if(navigator.share){
     try{ await navigator.share({title, text}); return true; }
@@ -758,7 +1063,9 @@ function shareApp(){
   shareText("Helvetia-Tools", "Découvrez Helvetia-Tools, l'assistant suisse pour les démarches du quotidien :\n" + url);
 }
 
-/* ============ Dictée vocale ============ */
+/* ============================================================
+   Dictée vocale
+   ============================================================ */
 function startDictation(targetId, btn){
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if(!SR){ showToast("Dictée non supportée sur ce navigateur"); return; }
@@ -791,7 +1098,9 @@ function startDictation(targetId, btn){
   try{ rec.start(); }catch(e){ showToast("Impossible de démarrer"); activeRecognition = null; }
 }
 
-/* ============ PDF lettre ============ */
+/* ============================================================
+   PDF lettre
+   ============================================================ */
 function downloadLetterPDF(){
   let text = $("lOut").dataset.raw || "";
   if(!text){ showToast("Générez d'abord la lettre"); return; }
@@ -822,7 +1131,9 @@ function downloadLetterPDF(){
   }
 }
 
-/* ============ Télécharger données JSON ============ */
+/* ============================================================
+   Télécharger données JSON
+   ============================================================ */
 function downloadData(){
   try{
     const blob = new Blob([JSON.stringify(appData, null, 2)], {type:"application/json"});
@@ -836,7 +1147,9 @@ function downloadData(){
   }catch(e){ showToast("Téléchargement impossible"); }
 }
 
-/* ============ CORRIGÉ : Calcul impôts (barèmes réajustés — plus réalistes) ============ */
+/* ============================================================
+   Calcul impôts
+   ============================================================ */
 function calcTaxes(){
   const canton = $("taxCanton").value;
   const situation = $("taxMarital").value;
@@ -846,8 +1159,6 @@ function calcTaxes(){
   if(income <= 0){ out.innerHTML = `<div class="result warning">Saisissez un revenu annuel.</div>`; return; }
   const base = Math.max(0, income - ded);
 
-  /* Barèmes progressifs réajustés pour approcher la réalité 2024.
-     Impôt total = cantonal + communal + IFD, célibataire sans enfant, sans fortune. */
   const bracketsSingle = {
     VD:[[0,.00],[12000,.08],[25000,.15],[40000,.20],[60000,.24],[90000,.28],[130000,.31],[200000,.33],[400000,.35]],
     GE:[[0,.00],[12000,.09],[25000,.17],[40000,.22],[60000,.26],[90000,.30],[130000,.33],[200000,.35],[400000,.37]],
@@ -886,7 +1197,9 @@ function clearTaxes(){
   $("taxResult").innerHTML = "";
 }
 
-/* ============ Comparateur primes LAMal ============ */
+/* ============================================================
+   Comparateur primes LAMal
+   ============================================================ */
 function calcPrimeRange(){
   const age = $("pAge").value;
   const canton = $("pCanton").value;
@@ -912,7 +1225,9 @@ function calcPrimeRange(){
 }
 function clearPrimeRange(){ $("pPrimeResult").innerHTML = ""; }
 
-/* ============ Persistance ============ */
+/* ============================================================
+   Persistance
+   ============================================================ */
 function cloneDefault(){ return JSON.parse(JSON.stringify(DEFAULT_DATA)); }
 
 function loadData(){
@@ -937,8 +1252,26 @@ function ensureData(){
   saveData();
 }
 
-function saveData(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(appData)); }catch(e){ console.error(e); } }
+function saveData(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+    // Push cloud (débounce 800ms)
+    if(currentUser && fbDb){
+      const now = Date.now();
+      if(now - lastLocalSave > 800){
+        lastLocalSave = now;
+        cloudSyncPush();
+      } else {
+        clearTimeout(saveData._t);
+        saveData._t = setTimeout(() => { lastLocalSave = Date.now(); cloudSyncPush(); }, 800);
+      }
+    }
+  }catch(e){ console.error(e); }
+}
 
+/* ============================================================
+   Construction interface
+   ============================================================ */
 function buildUI(){
   $("homeGrid").innerHTML = Object.entries(MODULES).map(([k,m]) => `
     <div class="card">
@@ -995,6 +1328,7 @@ function openPanel(name){
   if(name === "favorites") renderFavorites();
   if(name === "calendar") renderCalendar();
   if(name === "family" || name === "documents") renderList(name);
+  if(name === "settings") updateCloudUI();
 }
 
 function updateBottomNav(active){
@@ -1003,6 +1337,9 @@ function updateBottomNav(active){
   const nav = $("nav-" + active); if(nav) nav.classList.add("active");
 }
 
+/* ============================================================
+   Favoris
+   ============================================================ */
 function favInfo(key){
   if(String(key).startsWith("act:")){
     const a = ACTIONS[key.slice(4)];
@@ -1057,6 +1394,9 @@ async function clearFavorites(){
   appData.favorites = []; saveData(); refreshFavorites(); showToast("Favoris supprimés");
 }
 
+/* ============================================================
+   Assistant
+   ============================================================ */
 const RULES = [
   ["phone", /numero|telephone|portable|appel|\+41|\b0\d{2}[\s.]?\d{3}/],
   ["scam", /arnaque|scam|suspect|phishing|sms|e-?mail|lien/],
@@ -1112,6 +1452,9 @@ function analyzeAssistant(){
 
 function quickCompany(kind){ const name = assistantCompany; if(!name) return; openExternal(companyUrl(kind, name)); if(kind === "zefix") copyQuiet(name); }
 
+/* ============================================================
+   Téléphone
+   ============================================================ */
 function normalizePhone(value){
   let p = String(value || "").replace(/[^\d+]/g,"");
   if(p.startsWith("0041")) p = "+41" + p.slice(4);
@@ -1188,6 +1531,9 @@ function renderNumbers(){
 
 function removeNumber(i){ appData.numbers.splice(i,1); saveData(); renderNumbers(); }
 
+/* ============================================================
+   Entreprise
+   ============================================================ */
 function getCompany(){ return $("companyInput").value.trim(); }
 
 function companyUrl(kind, name){
@@ -1213,6 +1559,9 @@ function companySearch(kind){
 
 function clearCompany(){ $("companyInput").value = ""; $("companyResult").innerHTML = ""; }
 
+/* ============================================================
+   Argent
+   ============================================================ */
 function renderMoney(){ MONEY_FIELDS.forEach(([k]) => { const el = $("money_" + k); if(el) el.value = appData.money[k] ?? ""; }); }
 
 function getMoneyValues(){
@@ -1246,6 +1595,9 @@ function moneyBars(v){
   }).join("")}<div class="small" style="margin-top:8px">Le loyer apparaît en rouge s'il dépasse environ un tiers du revenu.</div></div>`;
 }
 
+/* ============================================================
+   Logement
+   ============================================================ */
 const HOUSING_IDS = {place:"housingPlace",canton:"housingCanton",type:"housingType",rooms:"housingRooms",maxRent:"housingMaxRent",availability:"housingAvailability"};
 
 function getHousing(){
@@ -1306,6 +1658,9 @@ function openSubsidizedHousing(){
   $("housingSearchResult").innerHTML = `<div class="result info">🏛️ Page des logements subventionnés de Vaud ouverte.<br>${place ? "Commune recherchée : <strong>" + escapeHtml(place) + "</strong>" : "Cherchez votre commune sur le site."}</div>`;
 }
 
+/* ============================================================
+   Listes
+   ============================================================ */
 function renderList(key){
   const c = $(key + "List");
   const items = appData[key] || [];
@@ -1351,6 +1706,9 @@ function copyList(key){
   copyText(items.map(i => (i.done ? "[x] " : "[ ] ") + i.text + (i.due ? " (" + fmtDate(i.due) + ")" : "")).join("\n"));
 }
 
+/* ============================================================
+   Caméra / Scam
+   ============================================================ */
 async function startCamera(){
   if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ showToast("Caméra non disponible"); return; }
   try{
@@ -1483,6 +1841,9 @@ function callCheck(){
   $("callResult").innerHTML = n ? `<div class="result danger"><strong>🚨 Probable arnaque (${n} signal/signaux)</strong><br><br>1. Raccrochez maintenant.<br>2. Ne donnez aucun code, ne faites aucun paiement.<br>3. Rappelez vous-même le numéro officiel.<br>4. Si vous avez payé : banque tout de suite, puis police (117).</div>` : "";
 }
 
+/* ============================================================
+   Règle loyer / Annonce
+   ============================================================ */
 function rentRule(){
   const income = +(appData.money || {}).income || 0;
   const rent = parseFloat($("housingMaxRent").value) || 0;
@@ -1513,6 +1874,9 @@ function checkListing(){
 
 function clearListing(){ $("listingText").value = ""; $("listingResult").innerHTML = ""; }
 
+/* ============================================================
+   Contrôleur loyer
+   ============================================================ */
 function rentCalc(){
   const rent = parseFloat($("rRent").value), base = parseFloat($("rBase").value), infl = parseFloat($("rInfl").value) || 0;
   if(!(rent > 0)) return null;
@@ -1570,6 +1934,9 @@ function addRateReminder(){
   showToast("Rappel ajouté pour le " + fmtDate(cand));
 }
 
+/* ============================================================
+   Assurance maladie
+   ============================================================ */
 const HEALTH_STEPS = ["Recevoir ma lettre de nouvelle prime (au plus tard fin octobre)","Comparer les primes sur priminfo.admin.ch","Comparer franchises et modèles d'assurance","Demander l'offre à la nouvelle caisse avant de résilier","Envoyer la résiliation (recommandé) avant la date limite"];
 
 function lastWorkingDayNov(y){
@@ -1632,6 +1999,9 @@ function addHealthReminder(){
   showToast("Rappel ajouté : une semaine avant la date limite");
 }
 
+/* ============================================================
+   Aujourd'hui
+   ============================================================ */
 function renderToday(){
   const box = $("todayBox"); if(!box) return;
   const tag = (list, src) => (list || []).map(i => ({...i, src}));
@@ -1649,6 +2019,9 @@ function renderToday(){
     ${bal !== null ? `<div class="row">💰 Solde mensuel : <strong>${formatCHF(bal)}</strong></div>` : ""}</div>`;
 }
 
+/* ============================================================
+   Validation IBAN/AVS/IDE
+   ============================================================ */
 function ibanValid(v){
   const s = v.replace(/\s/g,"").toUpperCase();
   if(!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(s)) return false;
@@ -1687,6 +2060,9 @@ function validateNumber(){
   out.innerHTML = raw ? `<div class="result ${ok ? "success" : "danger"}">${ok ? "✅" : "❌"} ${escapeHtml(note)}</div>` : `<div class="result warning">Saisissez un numéro.</div>`;
 }
 
+/* ============================================================
+   QR-facture
+   ============================================================ */
 function parseBill(t){
   const L = t.split(/\r?\n/);
   if(L[0] !== "SPC") return null;
@@ -1736,6 +2112,9 @@ async function addBill(){
 
 function clearBill(){ lastBill = null; $("billResult").innerHTML = ""; $("billFile").value = ""; $("billFile2").value = ""; }
 
+/* ============================================================
+   Lettres types
+   ============================================================ */
 const LETTERS = {
   bail:(f) => `Objet : Résiliation de bail\n\nMadame, Monsieur,\n\nPar la présente, je résilie mon bail concernant le logement situé ${f.addr}, pour le prochain terme contractuel et dans le respect du délai de congé. ${f.detail}\n\nMerci de me confirmer la réception de ce courrier et de convenir d'une date pour l'état des lieux de sortie.`,
   assurance:(f) => `Objet : Résiliation de mon contrat d'assurance\n\nMadame, Monsieur,\n\nPar la présente, je résilie mon contrat d'assurance pour la prochaine échéance possible. ${f.detail}\n\nMerci de me confirmer par écrit la fin du contrat.`,
@@ -1769,6 +2148,9 @@ function copyLetter(){ const text = $("lOut").dataset.raw || ""; if(!text){ show
 function printLetter(){ const text = $("lOut").dataset.raw || ""; if(!text){ showToast("Générez d'abord la lettre"); return; } window.print(); }
 function clearLetter(){ ["lName","lAddr","lTo","lDetail"].forEach(id => { const el = $(id); if(el) el.value = ""; }); $("lOut").textContent = ""; $("lOut").dataset.raw = ""; }
 
+/* ============================================================
+   Franchise
+   ============================================================ */
 function franchiseCost(prime, f, costs){ const share = costs <= f ? costs : f + Math.min(0.1 * (costs - f), 700); return prime * 12 + share; }
 
 function compareFranchise(){
@@ -1787,6 +2169,9 @@ function compareFranchise(){
 
 function clearFranchise(){ ["pA","pB","fCosts"].forEach(id => { const el = $(id); if(el) el.value = ""; }); $("fA").value = "300"; $("fB").value = "2500"; $("fResult").innerHTML = ""; }
 
+/* ============================================================
+   Brut → net
+   ============================================================ */
 function calcNet(){
   const g = parseFloat($("gross").value);
   const lpp = parseFloat($("lppPct").value) || 0, aanp = parseFloat($("aanpPct").value) || 0;
@@ -1801,6 +2186,9 @@ function calcNet(){
 
 function clearNet(){ $("gross").value = ""; $("lppPct").value = "5"; $("aanpPct").value = "1"; $("netResult").innerHTML = ""; }
 
+/* ============================================================
+   Parcours de vie
+   ============================================================ */
 const LIFE = {
   move:["🚚 Déménagement",[["Informer La Poste du changement d'adresse",-7],["Informer l'assurance maladie et l'employeur",-7],["Mettre à jour assurance ménage et RC",-14],["État des lieux de sortie",0],["Annoncer l'arrivée à la commune (dans les 14 jours)",14],["Récupérer la caution",30]]],
   birth:["👶 Naissance",[["Informer l'employeur (congé, horaires)",-60],["Annoncer la naissance à l'état civil",3],["Affilier l'enfant à une assurance maladie",30],["Demander les allocations familiales",30],["Mettre à jour assurances et testament",90]]],
@@ -1845,6 +2233,9 @@ async function removeLife(){
 
 function clearLife(){ $("lifeType").selectedIndex = 0; $("lifeDate").value = ""; $("lifeResult").innerHTML = ""; }
 
+/* ============================================================
+   Calendrier
+   ============================================================ */
 const SWISS_DATES = [["🏥 Assurance maladie : résiliation au plus tard le dernier jour ouvrable de novembre",11,30],["💼 3e pilier A : dernier versement de l'année",12,31],["🧾 Déclaration d'impôts (souvent, selon le canton)",3,31]];
 
 function nextDate(m, d){
@@ -1935,6 +2326,9 @@ async function clearCalendar(){
   showToast("Échéances effacées");
 }
 
+/* ============================================================
+   QR Shield
+   ============================================================ */
 const OFFICIAL = ["post.ch","swisscom.ch","postfinance.ch","sbb.ch","twint.ch","admin.ch","ch.ch","ubs.com","raiffeisen.ch","zkb.ch","migros.ch","coop.ch","sunrise.ch","salt.ch","localsearch.ch","local.ch","search.ch","ncsc.admin.ch","antiphishing.ch"];
 const SHORTENERS = ["bit.ly","tinyurl.com","t.co","goo.gl","is.gd","cutt.ly","rb.gy","ow.ly","shorturl.at"];
 const BAD_TLD = ["xyz","top","click","icu","live","buzz","cyou","cfd","sbs","rest"];
@@ -2031,6 +2425,9 @@ function handleQrShield(e){
 function clearQr(){ lastQr = null; $("qrUrl").value = ""; $("qrResult").innerHTML = ""; }
 function clearValidator(){ $("vInput").value = ""; $("vResult").innerHTML = ""; }
 
+/* ============================================================
+   Paramètres
+   ============================================================ */
 function restoreApp(){
   appData = loadData(); ensureData(); renderAll();
   $("settingsResult").innerHTML = `<div class="result success">↩️ Les données enregistrées ont été rechargées.</div>`;
@@ -2048,6 +2445,9 @@ async function clearAllData(){
   showToast("Données effacées");
 }
 
+/* ============================================================
+   Modale
+   ============================================================ */
 let modalPrevFocus = null;
 
 function uiForm(title, fields, ok = "OK"){
@@ -2058,6 +2458,7 @@ function uiForm(title, fields, ok = "OK"){
       ? `<p style="margin-bottom:10px">${escapeHtml(f.text)}</p>`
       : `<div class="field" style="margin-bottom:10px"><label for="mf${i}">${escapeHtml(f.label)}</label><input id="mf${i}" type="${f.type || "text"}" value="${escapeAttr(f.value || "")}"></div>`).join("");
     $("modalOk").textContent = ok;
+    $("modalOk").style.display = "";
     const close = v => {
       $("modal").classList.add("hidden");
       document.removeEventListener("keydown", onKey);
@@ -2085,12 +2486,19 @@ function uiForm(title, fields, ok = "OK"){
 
 function uiConfirm(msg, ok = "Confirmer"){ return uiForm("Confirmation", [{text:msg}], ok).then(v => v !== null); }
 
+/* ============================================================
+   Rendu global
+   ============================================================ */
 function renderAll(){
   refreshFavorites(); renderMoney(); renderHousing();
   renderList("family"); renderList("documents"); renderList("applications");
   renderNumbers(); renderHealth(); renderRent(); renderToday();
+  updateCloudUI();
 }
 
+/* ============================================================
+   Bouton retour haut + démarrage
+   ============================================================ */
 function scrollToTop(){ window.scrollTo({top:0,behavior:"smooth"}); }
 function updateBackToTop(){ const b = document.getElementById("backToTop"); if(!b) return; if(window.scrollY > 400) b.classList.add("show"); else b.classList.remove("show"); }
 window.addEventListener("scroll", updateBackToTop, {passive:true});
@@ -2108,8 +2516,9 @@ document.addEventListener("DOMContentLoaded", () => {
   renderAll();
   updateBottomNav("home");
   updateBackToTop();
+  initFirebaseAuth();
+  updateCloudUI();
 });
 </script>
 </body>
 </html>
-
