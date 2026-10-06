@@ -825,7 +825,7 @@ function showToast(msg){
 }
 
 /* ============================================================
-   ONESIGNAL — Notifications Push (✅ CORRIGÉ)
+   ONESIGNAL — Notifications Push (CORRIGÉ)
    ============================================================ */
 
 function pushStatus(state, text){
@@ -851,16 +851,14 @@ function initOneSignal(){
   // Pousser la fonction d'init : elle sera exécutée dès que le SDK sera prêt
   window.OneSignalDeferred.push(async function(OneSignal){
     try{
-      // ✅ CORRECTION ICI : calcul automatique du chemin de base
+      // ✅ CORRECTION : chemins explicites vers le sous-dossier helvetia-tools
       const basePath = "/helvetia-tools/";
 
       await OneSignal.init({
         appId: ONESIGNAL_APP_ID,
         allowLocalhostAsSecureOrigin: true,
-        // ✅ CORRECTION ICI : chemins dynamiques (au lieu de "/helvetia-tools/")
         serviceWorkerParam: { scope: basePath },
         serviceWorkerPath: basePath + "OneSignalSDKWorker.js",
-        // ⬆️ FIN DE LA CORRECTION
         notifyButton: { enable: false },
         welcomeNotification: {
           title: "Helvetia-Tools",
@@ -877,12 +875,12 @@ function initOneSignal(){
     }
   });
 
-  // Sécurité : si OneSignal ne charge pas en 10 secondes, afficher un message
+  // Sécurité : si OneSignal ne charge pas en 30 secondes, afficher un message
   setTimeout(() => {
     if(!oneSignalReady){
       pushStatus("off", "OneSignal ne répond pas. Vérifie la connexion et recharge.");
     }
-  }, 10000);
+  }, 30000);
 }
 
 function attachOneSignalListeners(){
@@ -2673,3 +2671,4 @@ document.addEventListener("DOMContentLoaded", () => {
 </script>
 </body>
 </html>
+
