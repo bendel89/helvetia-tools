@@ -119,7 +119,6 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
 .cloud-status .dot{width:10px;height:10px;border-radius:50%;background:#bbb;flex-shrink:0}
 .cloud-status.online .dot{background:#16834b}
 .cloud-status.offline .dot{background:#b51218}
-.cloud-status .email{font-weight:700;color:var(--text);word-break:break-all}
 .push-status{display:flex;align-items:center;gap:8px;padding:12px;border-radius:12px;background:#f5f7f9;margin-bottom:10px;font-size:13px}
 .push-status .dot{width:10px;height:10px;border-radius:50%;background:#bbb;flex-shrink:0}
 .push-status.on .dot{background:#16834b}
@@ -580,7 +579,6 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
 
 <section id="panel-settings" class="panel" data-title="⚙️ Paramètres"><div class="panel-body">
 
-  <!-- ============ NOUVEAU : Notifications Push ============ -->
   <div class="section">
     <div class="section-title">🔔 Notifications Push</div>
     <p class="small" style="margin-bottom:10px">Recevez des rappels pour vos échéances, factures et délais importants.</p>
@@ -597,7 +595,6 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
     <div id="pushMessage" aria-live="polite"></div>
   </div>
 
-  <!-- ============ Synchronisation Cloud ============ -->
   <div class="section">
     <div class="section-title">☁️ Synchronisation Cloud</div>
     <p class="small" style="margin-bottom:10px">Retrouvez vos données sur tous vos appareils (iPhone, iPad, ordinateur).</p>
@@ -665,15 +662,10 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
   </div>
 </div>
 
-<!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-
-<!-- OneSignal SDK -->
 <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-
-<!-- Librairies existantes -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.0/dist/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
@@ -718,7 +710,7 @@ try {
 }
 
 /* ============================================================
-   Helvetia-Tools — JavaScript (base)
+   Helvetia-Tools — base
    ============================================================ */
 const $ = id => document.getElementById(id);
 const STORAGE_KEY = "helvetiaTools_v1";
@@ -852,61 +844,92 @@ function showPushMessage(msg, type = "info"){
   setTimeout(() => { if(box.innerHTML.includes(msg)) box.innerHTML = ""; }, 5000);
 }
 
-async function initOneSignal(){
-  try{
-    if(typeof OneSignal === "undefined"){
-      console.warn("OneSignal SDK pas encore chargé");
-      return;
+function initOneSignal(){
+  // Définir le tableau "deferred" AVANT que le SDK ne charge
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+
+  // Pousser la fonction d'init : elle sera exécutée dès que le SDK sera prêt
+  window.OneSignalDeferred.push(async function(OneSignal){
+    try{
+      await OneSignal.init({
+        appId: ONESIGNAL_APP_ID,
+        allowLocalhostAsSecureOrigin: true,
+        serviceWorkerParam: { scope: "/helvetia-tools/" },
+        serviceWorkerPath: "/helvetia-tools/OneSignalSDKWorker.js",
+        notifyButton: { enable: false },
+        welcomeNotification: {
+          title: "Helvetia-Tools",
+          message: "Merci d'avoir activé les notifications !"
+        }
+      });
+      oneSignalReady = true;
+      console.log("OneSignal initialisé");
+      updatePushUI();
+      attachOneSignalListeners();
+    }catch(e){
+      console.error("Erreur init OneSignal:", e);
+      pushStatus("off", "Erreur : " + (e.message || "inconnue"));
     }
-    // Certaines versions de OneSignal nécessitent cette étape
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-    OneSignalDeferred.push(async function(OneSignal){
-      try{
-        await OneSignal.init({
-          appId: ONESIGNAL_APP_ID,
-          allowLocalhostAsSecureOrigin: true,
-          serviceWorkerParam: { scope: "/" },
-          serviceWorkerPath: "OneSignalSDKWorker.js",
-          welcomeNotification: {
-            title: "Helvetia-Tools",
-            message: "Merci d'avoir activé les notifications !"
-          }
-        });
-        oneSignalReady = true;
-        console.log("OneSignal initialisé");
-        updatePushUI();
-      }catch(e){
-        console.error("Erreur init OneSignal:", e);
-        pushStatus("off", "Erreur d'initialisation");
-      }
-    });
+  });
+
+  // Sécurité : si OneSignal ne charge pas en 10 secondes, afficher un message
+  setTimeout(() => {
+    if(!oneSignalReady){
+      pushStatus("off", "OneSignal ne répond pas. Vérifie la connexion et recharge.");
+    }
+  }, 10000);
+}
+
+function attachOneSignalListeners(){
+  try{
+    if(typeof OneSignal === "undefined") return;
+    if(OneSignal.User && OneSignal.User.PushSubscription && OneSignal.User.PushSubscription.addEventListener){
+      OneSignal.User.PushSubscription.addEventListener("change", () => updatePushUI());
+    }
+    if(OneSignal.Notifications && OneSignal.Notifications.addEventListener){
+      OneSignal.Notifications.addEventListener("permissionChange", () => updatePushUI());
+    }
   }catch(e){
-    console.error("OneSignal indisponible:", e);
+    console.warn("Listener OneSignal:", e);
   }
 }
 
 function updatePushUI(){
+  const btn = $("pushEnableBtn");
+  const testBtn = $("pushTestBtn");
+  if(!btn) return;
+
   if(!oneSignalReady || typeof OneSignal === "undefined"){
     pushStatus("pending", "Chargement…");
+    btn.disabled = false;
+    btn.style.opacity = "";
+    btn.textContent = "🔔 Activer les notifications";
+    if(testBtn) testBtn.style.display = "none";
     return;
   }
+
   try{
     const isSubscribed = OneSignal.User && OneSignal.User.PushSubscription && OneSignal.User.PushSubscription.optedIn;
     const permission = (typeof Notification !== "undefined") ? Notification.permission : "default";
+
     if(isSubscribed){
       pushStatus("on", "✅ Notifications activées");
-      $("pushEnableBtn").textContent = "✅ Notifications actives";
-      $("pushEnableBtn").disabled = true;
-      $("pushEnableBtn").style.opacity = ".6";
-      $("pushTestBtn").style.display = "";
+      btn.textContent = "✅ Notifications actives";
+      btn.disabled = true;
+      btn.style.opacity = ".6";
+      if(testBtn) testBtn.style.display = "";
     } else if(permission === "denied"){
       pushStatus("off", "❌ Notifications refusées");
-      $("pushEnableBtn").textContent = "🔔 Réessayer (voir Réglages iPhone)";
-      $("pushTestBtn").style.display = "none";
+      btn.textContent = "🔔 Réessayer (voir Réglages iPhone)";
+      btn.disabled = false;
+      btn.style.opacity = "";
+      if(testBtn) testBtn.style.display = "none";
     } else {
       pushStatus("pending", "⏸️ Non activées");
-      $("pushEnableBtn").textContent = "🔔 Activer les notifications";
-      $("pushTestBtn").style.display = "none";
+      btn.textContent = "🔔 Activer les notifications";
+      btn.disabled = false;
+      btn.style.opacity = "";
+      if(testBtn) testBtn.style.display = "none";
     }
   }catch(e){
     console.warn("Erreur updatePushUI:", e);
@@ -919,18 +942,14 @@ async function enablePushNotifications(){
     return;
   }
   try{
-    // Demander la permission
     await OneSignal.Notifications.requestPermission();
-    // S'abonner
     await OneSignal.User.PushSubscription.optIn();
-    // Associer l'email Firebase si connecté
-    if(currentUser && currentUser.email){
+    if(currentUser){
       try{
         await OneSignal.login(currentUser.uid);
-        await OneSignal.User.addEmail(currentUser.email);
-      }catch(e){ console.warn("Liaison email OneSignal:", e); }
+        if(currentUser.email) await OneSignal.User.addEmail(currentUser.email);
+      }catch(e){ console.warn("Liaison OneSignal:", e); }
     }
-    // Ajouter des tags utiles
     try{
       await OneSignal.User.addTags({
         platform: "pwa",
@@ -945,21 +964,8 @@ async function enablePushNotifications(){
   }
 }
 
-async function sendTestNotification(){
-  if(!oneSignalReady) return;
-  showPushMessage("Test envoyé ! Vous devriez recevoir une notification dans 5-10 secondes.", "info");
-  // Note : la vraie notification doit être envoyée depuis OneSignal Dashboard
-  showToast("Test lancé — vérifiez OneSignal Dashboard pour envoi");
-}
-
-function updatePushStatusFromOS(){
-  if(typeof OneSignal === "undefined") return;
-  try{
-    OneSignal.User.PushSubscription.addEventListener("change", () => updatePushUI());
-    if(OneSignal.Notifications && OneSignal.Notifications.addEventListener){
-      OneSignal.Notifications.addEventListener("permissionChange", () => updatePushUI());
-    }
-  }catch(e){ console.warn("Listener OneSignal:", e); }
+function sendTestNotification(){
+  showPushMessage("Un test doit être envoyé depuis le tableau de bord OneSignal.", "info");
 }
 
 /* ============================================================
@@ -1076,10 +1082,6 @@ function openCloudLogin(){
   $("modalTitle").textContent = "🔑 Connexion Cloud";
   body.innerHTML = `
     <p class="small" style="margin-bottom:10px">Connectez-vous pour synchroniser vos données entre appareils.</p>
-    <div class="btn-row" style="margin-bottom:14px">
-      <button type="button" class="btn" style="background:#fff;border:1px solid var(--border);color:#222;width:100%" onclick="cloudLoginGoogle()">🔵 Continuer avec Google</button>
-    </div>
-    <p class="small" style="text-align:center;margin:10px 0">ou</p>
     <div class="field" style="margin-bottom:8px">
       <label for="cloudEmail">Adresse e-mail</label>
       <input id="cloudEmail" type="email" placeholder="votre@email.ch" autocomplete="email">
@@ -1135,26 +1137,6 @@ async function cloudRegisterEmail(){
   }
 }
 
-async function cloudLoginGoogle(){
-  if(!fbAuth){ showToast("Firebase non chargé"); return; }
-  try{
-    const provider = new firebase.auth.GoogleAuthProvider();
-    provider.setCustomParameters({prompt: "select_account"});
-    await fbAuth.signInWithPopup(provider);
-  }catch(e){
-    console.warn("Google login:", e);
-    if(e.code === "auth/popup-blocked" || e.code === "auth/operation-not-supported-in-this-environment"){
-      try{
-        await fbAuth.signInWithRedirect(new firebase.auth.GoogleAuthProvider());
-      }catch(e2){
-        cloudLoginMsg("❌ Connexion Google impossible. Utilisez l'email.", "danger");
-      }
-    } else {
-      cloudLoginMsg("❌ " + (e.message || "Erreur Google"), "danger");
-    }
-  }
-}
-
 async function cloudLogout(){
   if(!fbAuth) return;
   if(!await uiConfirm("Se déconnecter du cloud ? Vos données locales restent sur cet appareil.", "Se déconnecter")) return;
@@ -1183,7 +1165,6 @@ function initFirebaseAuth(){
       }catch(e){
         showCloudMessage("⚠️ Synchronisation impossible pour l'instant", "warning");
       }
-      // Lier OneSignal à l'utilisateur
       if(oneSignalReady && typeof OneSignal !== "undefined"){
         try{
           await OneSignal.login(user.uid);
@@ -2682,11 +2663,7 @@ document.addEventListener("DOMContentLoaded", () => {
   updateBackToTop();
   initFirebaseAuth();
   updateCloudUI();
-  // OneSignal init (attendre un peu que le SDK soit chargé)
-  setTimeout(() => {
-    initOneSignal();
-    updatePushStatusFromOS();
-  }, 1000);
+  initOneSignal();
 });
 </script>
 </body>
