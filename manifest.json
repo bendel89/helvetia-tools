@@ -1,0 +1,19 @@
+{
+  "name": "Helvetia-Tools",
+  "short_name": "Helvetia",
+  "description": "Assistant suisse pour les démarches du quotidien",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f6f8",
+  "theme_color": "#b51218",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='38' fill='%23b51218'/%3E%3Ctext x='96' y='128' font-size='110' text-anchor='middle' fill='white' font-family='Arial'%3E%F0%9F%87%A8%F0%9F%87%AD%3C/text%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
