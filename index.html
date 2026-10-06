@@ -120,6 +120,11 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
 .cloud-status.online .dot{background:#16834b}
 .cloud-status.offline .dot{background:#b51218}
 .cloud-status .email{font-weight:700;color:var(--text);word-break:break-all}
+.push-status{display:flex;align-items:center;gap:8px;padding:12px;border-radius:12px;background:#f5f7f9;margin-bottom:10px;font-size:13px}
+.push-status .dot{width:10px;height:10px;border-radius:50%;background:#bbb;flex-shrink:0}
+.push-status.on .dot{background:#16834b}
+.push-status.off .dot{background:#b51218}
+.push-status.pending .dot{background:#e5b93c}
 @media(max-width:700px){.letter-preview{padding:22px 20px;font-size:14px}.form-grid,.tool-grid{grid-template-columns:1fr}.panel-header h2{font-size:17px}}
 @media(max-width:430px){.card{min-height:125px;padding:14px}.card-icon{font-size:27px}.card h3{font-size:15px}.card p{font-size:12px}.favorite-panel-btn{font-size:11px;padding:7px 8px}}
 @media print{body *{visibility:hidden}.letter-preview,.letter-preview *{visibility:visible}.letter-preview{position:absolute;left:0;top:0;width:100%;border:0;box-shadow:none;padding:0;margin:0}.back-to-top{display:none}}
@@ -575,7 +580,24 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
 
 <section id="panel-settings" class="panel" data-title="⚙️ Paramètres"><div class="panel-body">
 
-  <!-- ============ NOUVEAU : Synchronisation Cloud ============ -->
+  <!-- ============ NOUVEAU : Notifications Push ============ -->
+  <div class="section">
+    <div class="section-title">🔔 Notifications Push</div>
+    <p class="small" style="margin-bottom:10px">Recevez des rappels pour vos échéances, factures et délais importants.</p>
+
+    <div id="pushStatus" class="push-status pending">
+      <span class="dot"></span>
+      <span id="pushStatusText">Vérification…</span>
+    </div>
+
+    <div class="btn-row">
+      <button type="button" class="btn primary" id="pushEnableBtn" onclick="enablePushNotifications()">🔔 Activer les notifications</button>
+      <button type="button" class="btn" id="pushTestBtn" onclick="sendTestNotification()" style="display:none">📨 Tester</button>
+    </div>
+    <div id="pushMessage" aria-live="polite"></div>
+  </div>
+
+  <!-- ============ Synchronisation Cloud ============ -->
   <div class="section">
     <div class="section-title">☁️ Synchronisation Cloud</div>
     <p class="small" style="margin-bottom:10px">Retrouvez vos données sur tous vos appareils (iPhone, iPad, ordinateur).</p>
@@ -643,10 +665,13 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
   </div>
 </div>
 
-<!-- Firebase SDK (compat) -->
+<!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+<!-- OneSignal SDK -->
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 
 <!-- Librairies existantes -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -654,6 +679,12 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
 <script>
 "use strict";
+
+/* ============================================================
+   CONFIGURATION ONESIGNAL
+   ============================================================ */
+const ONESIGNAL_APP_ID = "8e21b489-c542-41df-80e2-58cf16e0511f";
+let oneSignalReady = false;
 
 /* ============================================================
    CONFIGURATION FIREBASE
@@ -802,6 +833,136 @@ function showToast(msg){
 }
 
 /* ============================================================
+   ONESIGNAL — Notifications Push
+   ============================================================ */
+
+function pushStatus(state, text){
+  const box = $("pushStatus");
+  const txt = $("pushStatusText");
+  if(!box || !txt) return;
+  box.classList.remove("on", "off", "pending");
+  box.classList.add(state);
+  txt.textContent = text;
+}
+
+function showPushMessage(msg, type = "info"){
+  const box = $("pushMessage");
+  if(!box) return;
+  box.innerHTML = `<div class="result ${type}">${escapeHtml(msg)}</div>`;
+  setTimeout(() => { if(box.innerHTML.includes(msg)) box.innerHTML = ""; }, 5000);
+}
+
+async function initOneSignal(){
+  try{
+    if(typeof OneSignal === "undefined"){
+      console.warn("OneSignal SDK pas encore chargé");
+      return;
+    }
+    // Certaines versions de OneSignal nécessitent cette étape
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(async function(OneSignal){
+      try{
+        await OneSignal.init({
+          appId: ONESIGNAL_APP_ID,
+          allowLocalhostAsSecureOrigin: true,
+          serviceWorkerParam: { scope: "/" },
+          serviceWorkerPath: "OneSignalSDKWorker.js",
+          welcomeNotification: {
+            title: "Helvetia-Tools",
+            message: "Merci d'avoir activé les notifications !"
+          }
+        });
+        oneSignalReady = true;
+        console.log("OneSignal initialisé");
+        updatePushUI();
+      }catch(e){
+        console.error("Erreur init OneSignal:", e);
+        pushStatus("off", "Erreur d'initialisation");
+      }
+    });
+  }catch(e){
+    console.error("OneSignal indisponible:", e);
+  }
+}
+
+function updatePushUI(){
+  if(!oneSignalReady || typeof OneSignal === "undefined"){
+    pushStatus("pending", "Chargement…");
+    return;
+  }
+  try{
+    const isSubscribed = OneSignal.User && OneSignal.User.PushSubscription && OneSignal.User.PushSubscription.optedIn;
+    const permission = (typeof Notification !== "undefined") ? Notification.permission : "default";
+    if(isSubscribed){
+      pushStatus("on", "✅ Notifications activées");
+      $("pushEnableBtn").textContent = "✅ Notifications actives";
+      $("pushEnableBtn").disabled = true;
+      $("pushEnableBtn").style.opacity = ".6";
+      $("pushTestBtn").style.display = "";
+    } else if(permission === "denied"){
+      pushStatus("off", "❌ Notifications refusées");
+      $("pushEnableBtn").textContent = "🔔 Réessayer (voir Réglages iPhone)";
+      $("pushTestBtn").style.display = "none";
+    } else {
+      pushStatus("pending", "⏸️ Non activées");
+      $("pushEnableBtn").textContent = "🔔 Activer les notifications";
+      $("pushTestBtn").style.display = "none";
+    }
+  }catch(e){
+    console.warn("Erreur updatePushUI:", e);
+  }
+}
+
+async function enablePushNotifications(){
+  if(!oneSignalReady || typeof OneSignal === "undefined"){
+    showPushMessage("Patientez, OneSignal n'est pas encore prêt…", "warning");
+    return;
+  }
+  try{
+    // Demander la permission
+    await OneSignal.Notifications.requestPermission();
+    // S'abonner
+    await OneSignal.User.PushSubscription.optIn();
+    // Associer l'email Firebase si connecté
+    if(currentUser && currentUser.email){
+      try{
+        await OneSignal.login(currentUser.uid);
+        await OneSignal.User.addEmail(currentUser.email);
+      }catch(e){ console.warn("Liaison email OneSignal:", e); }
+    }
+    // Ajouter des tags utiles
+    try{
+      await OneSignal.User.addTags({
+        platform: "pwa",
+        appName: "Helvetia-Tools"
+      });
+    }catch(e){}
+    showPushMessage("✅ Notifications activées ! Vous recevrez les rappels importants.", "success");
+    setTimeout(() => updatePushUI(), 500);
+  }catch(e){
+    console.error("Erreur activation push:", e);
+    showPushMessage("Impossible d'activer les notifications. Vérifiez vos réglages iPhone.", "danger");
+  }
+}
+
+async function sendTestNotification(){
+  if(!oneSignalReady) return;
+  showPushMessage("Test envoyé ! Vous devriez recevoir une notification dans 5-10 secondes.", "info");
+  // Note : la vraie notification doit être envoyée depuis OneSignal Dashboard
+  showToast("Test lancé — vérifiez OneSignal Dashboard pour envoi");
+}
+
+function updatePushStatusFromOS(){
+  if(typeof OneSignal === "undefined") return;
+  try{
+    OneSignal.User.PushSubscription.addEventListener("change", () => updatePushUI());
+    if(OneSignal.Notifications && OneSignal.Notifications.addEventListener){
+      OneSignal.Notifications.addEventListener("permissionChange", () => updatePushUI());
+    }
+  }catch(e){ console.warn("Listener OneSignal:", e); }
+}
+
+/* ============================================================
    FIREBASE CLOUD SYNC
    ============================================================ */
 
@@ -847,7 +1008,6 @@ async function cloudSyncPull(){
       if(payload && payload.data){
         const remote = JSON.parse(payload.data);
         if(remote && typeof remote === "object"){
-          // Fusion : on garde les données distantes si elles existent, sinon on garde les locales
           appData = Object.assign(cloneDefault(), remote);
           ensureData();
           localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
@@ -856,7 +1016,6 @@ async function cloudSyncPull(){
         }
       }
     } else {
-      // Premier login : on upload les données locales
       await cloudSyncPush();
     }
   }catch(e){
@@ -873,7 +1032,6 @@ function startFirestoreListener(){
     if(!doc.exists) return;
     const payload = doc.data();
     if(!payload || !payload.data) return;
-    // Ignore si c'est nous qui venons de push
     if(syncInProgress) return;
     if(payload.updatedAt && Date.now() - payload.updatedAt < 3000) return;
     try{
@@ -914,7 +1072,6 @@ function updateCloudUI(){
 }
 
 function openCloudLogin(){
-  // Ouvre une modale de connexion
   const body = $("modalBody");
   $("modalTitle").textContent = "🔑 Connexion Cloud";
   body.innerHTML = `
@@ -1025,6 +1182,13 @@ function initFirebaseAuth(){
         showCloudMessage("☁️ Synchronisé avec le cloud", "success");
       }catch(e){
         showCloudMessage("⚠️ Synchronisation impossible pour l'instant", "warning");
+      }
+      // Lier OneSignal à l'utilisateur
+      if(oneSignalReady && typeof OneSignal !== "undefined"){
+        try{
+          await OneSignal.login(user.uid);
+          if(user.email) await OneSignal.User.addEmail(user.email);
+        }catch(e){ console.warn("Liaison OneSignal:", e); }
       }
     } else {
       showCloudMessage("Déconnecté. Données locales uniquement.", "info");
@@ -1255,7 +1419,6 @@ function ensureData(){
 function saveData(){
   try{
     localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
-    // Push cloud (débounce 800ms)
     if(currentUser && fbDb){
       const now = Date.now();
       if(now - lastLocalSave > 800){
@@ -1328,7 +1491,7 @@ function openPanel(name){
   if(name === "favorites") renderFavorites();
   if(name === "calendar") renderCalendar();
   if(name === "family" || name === "documents") renderList(name);
-  if(name === "settings") updateCloudUI();
+  if(name === "settings"){ updateCloudUI(); updatePushUI(); }
 }
 
 function updateBottomNav(active){
@@ -2494,6 +2657,7 @@ function renderAll(){
   renderList("family"); renderList("documents"); renderList("applications");
   renderNumbers(); renderHealth(); renderRent(); renderToday();
   updateCloudUI();
+  updatePushUI();
 }
 
 /* ============================================================
@@ -2518,7 +2682,13 @@ document.addEventListener("DOMContentLoaded", () => {
   updateBackToTop();
   initFirebaseAuth();
   updateCloudUI();
+  // OneSignal init (attendre un peu que le SDK soit chargé)
+  setTimeout(() => {
+    initOneSignal();
+    updatePushStatusFromOS();
+  }, 1000);
 });
 </script>
 </body>
 </html>
+
