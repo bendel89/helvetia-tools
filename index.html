@@ -852,7 +852,7 @@ function initOneSignal(){
   window.OneSignalDeferred.push(async function(OneSignal){
     try{
       // ✅ CORRECTION ICI : calcul automatique du chemin de base
-      const basePath = window.location.pathname.replace(/\/[^\/]*$/, "/");
+      const basePath = "/helvetia-tools/";
 
       await OneSignal.init({
         appId: ONESIGNAL_APP_ID,
