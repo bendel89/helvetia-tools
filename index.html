@@ -1,0 +1,1877 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#b51218">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="description" content="Helvetia-Tools — assistant suisse pour les démarches du quotidien.">
+<title>Helvetia-Tools — Assistant suisse</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--red:#b51218;--green:#16834b;--blue:#1769aa;--bg:#f4f6f8;--text:#1d1d1f;--muted:#5b6168;--border:#e2e5e9;--card:#fff;--shadow:0 5px 18px rgba(0,0,0,.08)}
+@media(prefers-color-scheme:dark){:root{--bg:#121417;--text:#f1f3f5;--muted:#9aa1a9;--border:#2a2f35;--card:#1b1f24;--shadow:0 5px 18px rgba(0,0,0,.5)}}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:82px;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--blue);outline-offset:2px;border-radius:6px}
+.header{background:var(--red);color:#fff;padding:15px 16px 18px;position:sticky;top:0;z-index:50;box-shadow:0 3px 12px rgba(0,0,0,.16)}
+.header-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.logo{font-size:21px;font-weight:800}
+.header-actions{display:flex;gap:7px}
+.icon-btn{border:0;background:rgba(255,255,255,.18);color:#fff;width:40px;height:40px;border-radius:12px;font-size:19px}
+.search-box{margin-top:13px;display:flex;gap:8px}
+.search-box input{flex:1;border:0;border-radius:13px;padding:13px 14px;outline:none;background:#fff;color:#222}
+.search-box button{border:0;background:#fff;color:var(--red);border-radius:13px;padding:0 15px;font-weight:700}
+.container{width:min(1100px,100%);margin:auto;padding:18px 14px 30px}
+.welcome{margin-bottom:16px}
+.welcome h1{font-size:25px;margin-bottom:4px}
+.welcome p{color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:17px;box-shadow:var(--shadow);min-height:135px;position:relative}
+.card-main{border:0;width:100%;text-align:left;background:transparent;padding:0;color:inherit}
+.card-icon{font-size:30px;margin-bottom:8px}
+.card h3{font-size:17px;margin-bottom:5px}
+.card p{font-size:13px;color:var(--muted);line-height:1.4}
+.star-home,.act-star{border:1px solid var(--border);background:var(--card);font-size:18px;color:var(--muted)}
+.star-home{position:absolute;top:10px;right:10px;width:34px;height:34px;border-radius:50%}
+.star-home.on,.act-star.on{background:#fff6d8;border-color:#e5b93c;color:#805e00}
+.panel{display:none;background:var(--card);border-radius:20px;box-shadow:var(--shadow);margin-top:16px;overflow:hidden}
+.panel.active{display:block}
+.panel-header{padding:15px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.panel-header h2{font-size:19px}
+.panel-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.favorite-panel-btn{border:1px solid var(--border);background:var(--card);color:var(--muted);border-radius:10px;padding:8px 10px;font-size:12px;font-weight:700;white-space:nowrap}
+.favorite-panel-btn.on{background:#fff6d8;border-color:#e5b93c;color:#805e00}
+.close-btn{border:0;background:#f0f1f3;color:#555;width:36px;height:36px;border-radius:10px;font-size:23px;line-height:1}
+.panel-body{padding:16px}
+.section{margin-bottom:20px}
+.section:last-child{margin-bottom:0}
+.section-title{font-size:16px;font-weight:800;margin-bottom:10px}
+.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.field{display:flex;flex-direction:column;gap:5px}
+.field.full{grid-column:1/-1}
+.field label{font-size:13px;font-weight:700;color:var(--text)}
+.field input,.field select,.field textarea{width:100%;border:1px solid #d8dce1;border-radius:11px;padding:11px 12px;background:var(--card);outline:none;color:var(--text)}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--red)}
+.field textarea{min-height:110px;resize:vertical}
+::placeholder{color:#9aa1a9;opacity:1}
+input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:none;appearance:none;text-align:left;min-height:46px}
+.checkbox{display:flex;align-items:center;gap:9px;padding:6px 0}
+.checkbox input{width:18px;height:18px}
+.btn-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.btn{border:0;border-radius:11px;padding:11px 14px;font-weight:700;background:#eef0f2;color:var(--text)}
+.btn.primary{background:var(--red);color:#fff}
+.btn.green{background:var(--green);color:#fff}
+.btn.blue{background:var(--blue);color:#fff}
+.btn.danger{background:#fff0f0;color:#b51218;border:1px solid #f2c1c4}
+.btn small{display:block;font-weight:400;opacity:.75;margin-top:2px}
+.act{display:flex;gap:8px;margin-top:8px}
+.act-main{flex:1;text-align:left;border:1px solid var(--border);background:var(--card)}
+.act-star{width:46px;border-radius:11px;flex-shrink:0}
+.result{margin-top:12px;padding:13px;border-radius:12px;background:#f5f7f9;line-height:1.55;font-size:14px;word-break:break-word}
+.result.success{background:#ecf8f1;color:#0f4d2c}
+.result.warning{background:#fff7e6;color:#6b4a00}
+.result.danger{background:#fff0f0;color:#8f1820}
+.result.info{background:#eef6ff;color:#124a7a}
+.tool-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.tool{background:#f7f8f9;border:1px solid var(--border);border-radius:14px;padding:14px}
+.tool h3{font-size:15px;margin-bottom:5px}
+.tool p{color:var(--muted);font-size:13px;line-height:1.45}
+.list{display:grid;gap:9px}
+.item{display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--border);border-radius:12px;padding:11px 12px}
+.item>button,.item .rm{border:0;background:#fff0f0;color:#b51218;border-radius:8px;padding:7px 10px}
+.item .open{background:transparent;color:var(--text);text-align:left;flex:1;padding:0}
+.item label{display:flex;align-items:center;gap:10px;flex:1;cursor:pointer}
+.item input[type=checkbox]{width:18px;height:18px}
+.done{text-decoration:line-through;color:var(--muted)}
+.badge{display:block;font-size:12px;color:var(--muted)}
+.badge.late{color:#b51218;font-weight:700}
+.empty{padding:18px;text-align:center;color:var(--muted);background:#f7f8f9;border-radius:12px}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:100;background:var(--card);border-top:1px solid var(--border);display:flex;justify-content:space-around;padding:8px 4px calc(8px + env(safe-area-inset-bottom));box-shadow:0 -4px 15px rgba(0,0,0,.08)}
+.bottom-nav button{border:0;background:transparent;color:var(--muted);font-size:11px;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:58px}
+.bottom-nav button span{font-size:20px}
+.bottom-nav button.active{color:var(--red);font-weight:800}
+.toast{position:fixed;left:50%;bottom:88px;transform:translateX(-50%) translateY(20px);background:#202124;color:#fff;padding:11px 15px;border-radius:12px;font-size:13px;z-index:300;opacity:0;pointer-events:none;transition:.25s;max-width:90%;text-align:center}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.camera-box{border:2px dashed #d5d9de;border-radius:15px;padding:15px;text-align:center;background:#fafafa}
+.camera-box video,.camera-box img{width:100%;max-height:330px;object-fit:contain;border-radius:12px;margin-top:10px;background:#111}
+.hidden{display:none!important}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:400;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal-box{background:var(--card);border-radius:18px;padding:18px;width:min(420px,100%);max-height:90vh;overflow:auto}
+.risk-score{font-size:26px;font-weight:900}
+.small{font-size:12px;color:var(--muted)}
+.row{display:flex;align-items:center;gap:7px;margin:4px 0}
+.letter-preview{background:#fff;color:#1a1a1a;border:1px solid #d0d4d8;border-radius:8px;padding:32px 36px;font-family:Georgia,"Times New Roman",Times,serif;font-size:15px;line-height:1.7;white-space:pre-wrap;word-wrap:break-word;box-shadow:0 2px 12px rgba(0,0,0,.08);min-height:260px;margin-top:10px}
+.letter-preview:empty::before{content:"📝 La lettre générée s'affichera ici en aperçu papier.\A\A Remplissez les champs ci-dessus puis appuyez sur « Générer ».";color:#9aa1a9;font-style:italic;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;font-size:14px;white-space:pre-wrap}
+@media(max-width:700px){.letter-preview{padding:22px 20px;font-size:14px}.form-grid,.tool-grid{grid-template-columns:1fr}.panel-header h2{font-size:17px}}
+@media(max-width:430px){.card{min-height:125px;padding:14px}.card-icon{font-size:27px}.card h3{font-size:15px}.card p{font-size:12px}.favorite-panel-btn{font-size:11px;padding:7px 8px}}
+@media print{body *{visibility:hidden}.letter-preview,.letter-preview *{visibility:visible}.letter-preview{position:absolute;left:0;top:0;width:100%;border:0;box-shadow:none;padding:0;margin:0}}
+</style>
+</head>
+  <body>
+
+<header class="header">
+  <div class="header-top">
+    <div class="logo">🇨🇭 Helvetia-Tools</div>
+    <div class="header-actions">
+      <button type="button" class="icon-btn" aria-label="Favoris" onclick="openPanel('favorites')">⭐</button>
+      <button type="button" class="icon-btn" aria-label="Paramètres" onclick="openPanel('settings')">⚙️</button>
+    </div>
+  </div>
+  <div class="search-box">
+    <input id="globalSearchInput" type="search" placeholder="Rechercher une fonctionnalité..." onkeydown="if(event.key==='Enter')globalSearch()">
+    <button type="button" onclick="globalSearch()" aria-label="Rechercher">🔎</button>
+  </div>
+</header>
+
+<main class="container">
+
+<section id="homeSection">
+  <div class="welcome"><h1>Bonjour 👋</h1><p>Votre assistant suisse pour les démarches du quotidien.</p></div>
+  <div id="todayBox"></div>
+  <div class="grid" id="homeGrid"></div>
+</section>
+
+<section id="panel-assistant" class="panel"><div class="panel-body">
+  <div class="section">
+    <div class="section-title">Que recherchez-vous ?</div>
+    <div class="field"><textarea id="assistantInput" placeholder="Ex. : un numéro suisse, un appartement, une arnaque…" maxlength="2000"></textarea></div>
+    <div class="btn-row">
+      <button type="button" class="btn primary" onclick="analyzeAssistant()">🤖 Analyser</button>
+      <button type="button" class="btn" onclick="$('assistantInput').value='';$('assistantResult').innerHTML=''">Effacer</button>
+    </div>
+    <div id="assistantResult" aria-live="polite"></div>
+  </div>
+  <div class="section">
+    <div class="section-title">Accès rapides</div>
+    <div class="btn-row">
+      <button type="button" class="btn" onclick="openPanel('housing')">🏠 Logement</button>
+      <button type="button" class="btn" onclick="openPanel('money')">💰 Argent</button>
+      <button type="button" class="btn" onclick="openPanel('phone')">📞 Téléphone</button>
+      <button type="button" class="btn" onclick="openPanel('scam')">🛡️ Arnaque</button>
+      <button type="button" class="btn" onclick="openPanel('admin')">🇨🇭 Administration</button>
+      <button type="button" class="btn" onclick="openPanel('documents')">📄 Documents</button>
+    </div>
+  </div>
+</div></section>
+
+<section id="panel-documents" class="panel"><div class="panel-body">
+  <div class="section">
+    <div class="section-title">Documents et échéances</div>
+    <p class="small" style="margin-bottom:10px">Ajoutez une échéance : les documents en retard apparaissent en rouge.</p>
+    <div id="documentsList"></div>
+    <div class="btn-row">
+      <button type="button" class="btn primary" onclick="addItem('documents')">➕ Ajouter</button>
+      <button type="button" class="btn" onclick="addChecklist()">📋 Checklist administrative</button>
+      <button type="button" class="btn" onclick="copyList('documents')">📤 Copier la liste</button>
+      <button type="button" class="btn danger" onclick="clearList('documents')">🗑️ Effacer</button>
+    </div>
+  </div>
+</div></section>
+
+<section id="panel-scam" class="panel"><div class="panel-body">
+  <div class="section">
+    <div class="section-title">📷 Photo / caméra / QR</div>
+    <div class="camera-box">
+      <input id="scamFile" type="file" accept="image/*" onchange="handleScamFile(event)">
+      <div class="btn-row">
+        <label class="btn primary" for="scamCapture" style="display:inline-block;cursor:pointer">📷 Prendre une photo</label>
+        <input id="scamCapture" type="file" accept="image/*" capture="environment" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none" onchange="handleScamFile(event)" aria-hidden="true" tabindex="-1">
+        <button type="button" class="btn" onclick="startCamera()">🎥 Caméra en direct</button>
+        <button type="button" class="btn" onclick="stopCamera()">⏹️ Arrêter</button>
+      </div>
+      <video id="cameraVideo" autoplay playsinline class="hidden"></video>
+      <div class="btn-row"><button type="button" class="btn green hidden" id="takePhotoBtn" onclick="takePhoto()">📸 Prendre la photo</button></div>
+      <canvas id="cameraCanvas" class="hidden"></canvas>
+      <img id="scamPreview" class="hidden" alt="Aperçu">
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-title">📩 Texte à analyser</div>
+    <div class="field"><textarea id="scamText" placeholder="Collez un SMS, e-mail, message suspect..." maxlength="12000"></textarea></div>
+    <div class="btn-row">
+      <button type="button" class="btn primary" onclick="analyzeScamText()">🛡️ Analyser</button>
+      <button type="button" class="btn" onclick="extractOCR()">🔤 Lire texte / QR</button>
+      <button type="button" class="btn danger" onclick="clearScam()">🗑️ Effacer</button>
+    </div>
+    <div id="scamResult" aria-live="polite"></div>
+  </div>
+  <div class="section">
+    <div class="section-title">🔳 QR Shield</div>
+    <p class="small" style="margin-bottom:8px">Scannez un QR <strong>avant</strong> de l'ouvrir : l'app affiche la vraie adresse.</p>
+    <div class="btn-row" style="margin-top:0">
+      <label class="btn primary" for="qrCapture" style="display:inline-block;cursor:pointer">📷 Scanner un QR</label>
+      <label class="btn" for="qrPick" style="display:inline-block;cursor:pointer">🖼️ Choisir une photo</label>
+    </div>
+    <input id="qrCapture" type="file" accept="image/*" capture="environment" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none" onchange="handleQrShield(event)" aria-hidden="true" tabindex="-1">
+    <input id="qrPick" type="file" accept="image/*" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none" onchange="handleQrShield(event)" aria-hidden="true" tabindex="-1">
+    <div class="field" style="margin-top:10px"><label for="qrUrl">Ou collez un lien</label><input id="qrUrl" type="url" inputmode="url" placeholder="https://..." autocomplete="off" onkeydown="if(event.key==='Enter')analyzeQrContent($('qrUrl').value)"></div>
+    <div class="btn-row">
+      <button type="button" class="btn primary" onclick="analyzeQrContent($('qrUrl').value)">🛡️ Vérifier</button>
+      <button type="button" class="btn danger" onclick="clearQr()">🗑️ Effacer</button>
+    </div>
+    <div id="qrResult" aria-live="polite"></div>
+  </div>
+  <div class="section">
+    <div class="section-title">📞 Je suis au téléphone</div>
+    <p class="small" style="margin-bottom:8px">Cochez ce que la personne vous demande :</p>
+    <div class="list" id="callList"></div>
+    <div id="callResult" aria-live="assertive"></div>
+  </div>
+</div></section>
+
+<section id="panel-phone" class="panel"><div class="panel-body">
+  <div class="section">
+    <div class="field"><label for="phoneInput">Numéro de téléphone</label><input id="phoneInput" type="tel" autocomplete="tel" placeholder="+41 79 123 45 67" onkeydown="if(event.key==='Enter')checkPhone()"></div>
+    <div class="btn-row">
+      <button type="button" class="btn primary" onclick="checkPhone()">🔎 Vérifier</button>
+      <button type="button" class="btn" onclick="clearPhone()">🗑️ Effacer</button>
+    </div>
+    <div id="phoneResult" aria-live="polite"></div>
+  </div>
+  <div class="section">
+    <div class="section-title">Rechercher qui appelle</div>
+    <p class="small">Le numéro est transmis directement au site. ⭐ ajoute aux favoris.</p>
+    <div class="actions" data-ids="phoneLocal,phoneSearch,phoneGoogle,phoneReports"></div>
+  </div>
+  <div class="section">
+    <div class="section-title">📒 Mes numéros</div>
+    <div class="btn-row" style="margin-top:8px">
+      <button type="button" class="btn green" onclick="saveNumber('connu')">✅ Connu</button>
+      <button type="button" class="btn danger" onclick="saveNumber('suspect')">🚩 Suspect</button>
+      <button type="button" class="btn" onclick="saveNumber('surveiller')">👀 À surveiller</button>
+    </div>
+    <div id="numbersList" style="margin-top:10px"></div>
+  </div>
+</div></section>
+
+<section id="panel-company" class="panel"><div class="panel-body">
+  <div class="section">
+    <div class="field"><label for="companyInput">Nom de l'entreprise</label><input id="companyInput" type="text" placeholder="Saisir un nom" onkeydown="if(event.key==='Enter')checkCompany()"></div>
+    <div class="btn-row">
+      <button type="button" class="btn primary" onclick="checkCompany()">🔎 Rechercher</button>
+      <button type="button" class="btn" onclick="clearCompany()">🗑️ Effacer</button>
+    </div>
+    <div id="companyResult" aria-live="polite"></div>
+  </div>
+  <div class="section">
+    <div class="section-title">Où chercher</div>
+    <div class="actions" data-ids="coLocal,coGoogle,coZefix"></div>
+  </div>
+</div></section>
+
+<section id="panel-money" class="panel"><div class="panel-body">
+  <div class="section">
+    <div class="section-title">💳 Mon budget mensuel</div>
+    <div class="form-grid" id="moneyForm"></div>
+    <div class="btn-row">
+      <button type="button" class="btn primary" onclick="calculateMoney()">🧮 Calculer</button>
+      <button type="button" class="btn green" onclick="saveMoney()">💾 Enregistrer</button>
+      <button type="button" class="btn danger" onclick="clearMoney()">🗑️ Effacer</button>
+    </div>
+    <div id="moneyResult" aria-live="polite"></div>
+  </div>
+  <div class="section">
+    <div class="section-title">🧰 Outils financiers</div>
+    <div class="tool-grid">
+      <div class="tool"><h3>📊 Budget</h3><p>Calculez vos dépenses et votre solde mensuel.</p></div>
+      <div class="tool"><h3>🧾 Factures</h3><p>Gardez une vue sur vos charges mensuelles.</p></div>
+      <div class="tool"><h3>🔄 Abonnements</h3><p>Ajoutez vos abonnements dans votre budget.</p></div>
+      <div class="tool"><h3>🇨🇭 Aides</h3><p>Accédez aux ressources administratives suisses.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<section id="panel-housing" class="panel"><div class="panel-body">
+  <div class="section">
+    <div class="section-title">🔎 Mes critères</div>
+    <div class="form-grid">
+      <div class="field"><label for="housingPlace">Lieu / commune</label><input id="housingPlace" type="text" placeholder="Ex. Ecublens"></div>
+      <div class="field"><label for="housingCanton">Canton</label>
+        <select id="housingCanton"><option value="">Choisir</option><option>VD</option><option>GE</option><option>VS</option><option>FR</option><option>NE</option><option>JU</option><option>BE</option><option>ZH</option><option>TI</option><option>AG</option><option>LU</option><option>SG</option><option>Autre</option></select></div>
+      <div class="field"><label for="housingType">Type</label>
+        <select id="housingType"><option value="">Tous</option><option>Appartement</option><option>Duplex</option><option>Maison</option><option>Studio</option><option>Attique</option><option>PPE</option></select></div>
+      <div class="field"><label for="housingRooms">Pièces minimum</label>
+        <select id="housingRooms"><option value="">Toutes</option><option>1</option><option>1.5</option><option>2</option><option>2.5</option><option>3</option><option>3.5</option><option>4</option><option>4.5</option><option>5</option><option>5.5</option><option value="6">6+</option></select></div>
+      <div class="field"><label for="housingMaxRent">Loyer maximum CHF</label><input id="housingMaxRent" type="number" min="0" step="50" placeholder="2500"></div>
+      <div class="field"><label for="housingAvailability">Disponibilité</label><input id="housingAvailability" type="text" placeholder="Ex. dès maintenant"></div>
+      <div class="field full"><label class="checkbox"><input id="housingSubsidized" type="checkbox" onchange="toggleSubsidy()"><span>Logement subventionné / loyer modéré</span></label></div>
+    </div>
+    <div id="subsidyBox" class="hidden">
+      <div class="result info">💡 Informations officielles de l'État de Vaud sur les logements subventionnés.</div>
+      <div class="actions" data-ids="hSubsidized"></div>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="btn green" onclick="saveHousing()">💾 Enregistrer</button>
+      <button type="button" class="btn" onclick="copyHousingCriteria()">📋 Copier critères</button>
+      <button type="button" class="btn danger" onclick="clearHousing()">🗑️ Effacer</button>
+    </div>
+    <div id="housingSavedResult" aria-live="polite"></div>
+  </div>
+  <div class="section">
+    <div class="section-title">📋 Suivi de mes candidatures</div>
+    <div id="applicationsList"></div>
+    <div class="btn-row">
+      <button type="button" class="btn primary" onclick="addItem('applications')">➕ Ajouter</button>
+      <button type="button" class="btn" onclick="rentRule()">⚖️ Loyer vs mon revenu</button>
+      <button type="button" class="btn danger" onclick="clearList('applications')">🗑️ Effacer</button>
+    </div>
+    <div id="rentRuleResult" aria-live="polite"></div>
+  </div>
+  <div class="section">
+    <div class="section-title">🕵️ Vérifier une annonce</div>
+    <div class="field"><textarea id="listingText" placeholder="Collez l'annonce ou le message du propriétaire..." maxlength="6000"></textarea></div>
+    <div class="btn-row">
+      <button type="button" class="btn primary" onclick="checkListing()">🛡️ Analyser</button>
+      <button type="button" class="btn" onclick="clearListing()">Effacer</button>
+    </div>
+    <div id="listingResult" aria-live="polite"></div>
+  </div>
+  <div class="section">
+    <div class="section-title">🔎 Chercher sur plusieurs sources</div>
+    <div class="actions" data-ids="hGoogle,hHomegate,hImmo,hComparis"></div>
+    <div id="housingSearchResult" aria-live="polite"></div>
+  </div>
+</div></section>
+
+<section id="panel-family" class="panel"><div class="panel-body">
+  <div class="section">
+    <div class="section-title">👨‍👩‍👧‍👦 Ma liste familiale</div>
+    <div id="familyList"></div>
+    <div class="btn-row">
+      <button type="button" class="btn primary" onclick="addItem('family')">➕ Ajouter une tâche</button>
+      <button type="button" class="btn danger" onclick="clearList('family')">🗑️ Effacer</button>
+    </div>
+  </div>
+</div></section>
+
+<section id="panel-admin" class="panel"><div class="panel-body">
+  <div class="section">
+    <div class="section-title">Services suisses</div>
+    <div class="actions" data-ids="aChch,aAdmin,aVd,aZefix,aPost,aBsv"></div>
+  </div>
+</div></section>
+
+<section id="panel-calendar" class="panel"><div class="panel-body">
+  <div class="section">
+    <div class="section-title">📅 Prochaines échéances</div>
+    <div id="calList"></div>
+    <div class="btn-row">
+      <button type="button" class="btn green" onclick="addItem('documents').then(renderCalendar)">➕ Ajouter une échéance</button>
+      <button type="button" class="btn primary" onclick="exportICS()">📤 Exporter vers mon agenda</button>
+      <button type="button" class="btn danger" onclick="clearCalendar()">🗑️ Tout effacer</button>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-title">🇨🇭 Dates clés en Suisse</div>
+    <div class="btn-row"><button type="button" class="btn" onclick="resetSwiss()">↩️ Restaurer les dates par défaut</button></div>
+  </div>
+</div></section>
+
+<section id="panel-life" class="panel"><div class="panel-body">
+  <div class="section">
+    <div class="section-title">Que se passe-t-il dans votre vie ?</div>
+    <div class="field"><label for="lifeType">Événement</label><select id="lifeType"></select></div>
+    <div class="field" style="margin-top:10px"><label for="lifeDate">Date de l'événement</label><input id="lifeDate" type="date"></div>
+    <div class="btn-row">
+      <button type="button" class="btn primary" onclick="previewLife()">👁️ Voir les étapes</button>
+      <button type="button" class="btn green" onclick="applyLife()">➕ Ajouter à mes documents</button>
+      <button type="button" class="btn" onclick="removeLife()">↩️ Retirer</button>
+      <button type="button" class="btn danger" onclick="clearLife()">🗑️ Effacer</button>
+    </div>
+    <div id="lifeResult" aria-live="polite"></div>
+  </div>
+</div></section>
+
+<section id="panel-health" class="panel"><div class="panel-body">
+  <div class="section"><div id="healthCountdown"></div></div>
+  <div class="section">
+    <div class="section-title">📈 Ma hausse de prime 2027</div>
+    <p class="small" style="margin-bottom:8px">Prime moyenne suisse 2027 : 412 CHF par mois (+5,0 %).</p>
+    <div class="form-grid">
+      <div class="field"><label for="hPrime">Ma prime actuelle (CHF/mois)</label><input id="hPrime" type="number" min="0" step="0.05" inputmode="decimal"></div>
+      <div class="field"><label for="hPreset">Hausse de référence</label>
+        <select id="hPreset" onchange="if(this.value)$('hPct').value=this.value"><option value="5">Moyenne suisse (5,0 %)</option><option value="3.5">Vaud (3,5 %)</option><option value="6.6">Jura (6,6 %)</option><option value="">Autre</option></select></div>
+      <div class="field full"><label for="hPct">Hausse estimée (%)</label><input id="hPct" type="number" step="0.1" inputmode="decimal" value="5"></div>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="btn primary" onclick="calcHealth()">🧮 Calculer</button>
+      <button type="button" class="btn danger" onclick="clearHealth()">🗑️ Effacer</button>
+    </div>
+    <div id="healthResult" aria-live="polite"></div>
+  </div>
+  <div class="section">
+    <div class="section-title">✅ Mes étapes</div>
+    <div id="healthSteps"></div>
+    <div class="btn-row">
+      <button type="button" class="btn blue" onclick="goTool('fA')">🏥 Comparer les franchises</button>
+      <button type="button" class="btn blue" onclick="healthLetter()">✉️ Lettre de résiliation</button>
+      <button type="button" class="btn green" onclick="addHealthReminder()">📅 Ajouter le rappel</button>
+    </div>
+    <div class="actions" data-ids="hPriminfo"></div>
+  </div>
+</div></section>
+
+<section id="panel-rent" class="panel"><div class="panel-body">
+  <div class="section">
+    <div class="result info" style="margin:0"><strong>📉 Taux de référence : 1,25 %</strong><br>En vigueur depuis le 2 septembre 2025. Si votre loyer repose sur un taux de 1,5 % ou plus, vous avez en principe droit à une baisse.</div>
+  </div>
+  <div class="section">
+    <div class="section-title">🧮 Ma baisse possible</div>
+    <div class="form-grid">
+      <div class="field"><label for="rRent">Loyer net actuel (CHF/mois)</label><input id="rRent" type="number" min="0" step="0.05" inputmode="decimal"></div>
+      <div class="field"><label for="rBase">Taux de référence du bail</label>
+        <select id="rBase"><option>1.25</option><option selected>1.5</option><option>1.75</option><option>2</option><option>2.25</option><option>2.5</option><option>2.75</option><option>3</option></select></div>
+      <div class="field full"><label for="rInfl">Inflation depuis dernière adaptation (%)</label><input id="rInfl" type="number" min="0" step="0.1" inputmode="decimal" value="0"></div>
+      <div class="field full"><label class="checkbox"><input id="rIndexed" type="checkbox"><span>Mon bail est indexé ou échelonné</span></label></div>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="btn primary" onclick="calcRent()">🧮 Calculer</button>
+      <button type="button" class="btn blue" onclick="rentLetter()">✉️ Lettre de demande</button>
+      <button type="button" class="btn danger" onclick="clearRent()">🗑️ Effacer</button>
+    </div>
+    <div id="rentResult" aria-live="polite"></div>
+  </div>
+  <div class="section">
+    <div class="section-title">🔔 Suivre le taux</div>
+    <div class="btn-row"><button type="button" class="btn green" onclick="addRateReminder()">📅 Rappel : prochaine publication</button></div>
+    <div class="actions" data-ids="rRate"></div>
+  </div>
+</div></section>
+
+<section id="panel-tools" class="panel"><div class="panel-body">
+  <div class="section">
+    <div class="section-title">🧾 Lire un QR-facture</div>
+    <div class="btn-row">
+      <label class="btn primary" for="billFile" style="display:inline-block;cursor:pointer">📷 Scanner</label>
+      <label class="btn" for="billFile2" style="display:inline-block;cursor:pointer">🖼️ Photo</label>
+      <button type="button" class="btn danger" onclick="clearBill()">🗑️ Effacer</button>
+    </div>
+    <input id="billFile" type="file" accept="image/*" capture="environment" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none" onchange="handleBill(event)" aria-hidden="true" tabindex="-1">
+    <input id="billFile2" type="file" accept="image/*" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none" onchange="handleBill(event)" aria-hidden="true" tabindex="-1">
+    <div id="billResult" aria-live="polite"></div>
+  </div>
+  <div class="section">
+    <div class="section-title">✅ Valider un numéro</div>
+    <div class="form-grid">
+      <div class="field"><label for="vType">Type</label><select id="vType"><option value="iban">IBAN</option><option value="avs">N° AVS</option><option value="uid">N° IDE</option></select></div>
+      <div class="field"><label for="vInput">Numéro</label><input id="vInput" type="text"></div>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="btn primary" onclick="validateNumber()">✅ Vérifier</button>
+      <button type="button" class="btn danger" onclick="clearValidator()">🗑️ Effacer</button>
+    </div>
+    <div id="vResult" aria-live="polite"></div>
+  </div>
+  <div class="section">
+    <div class="section-title">🏥 Comparer deux franchises</div>
+    <div class="form-grid">
+      <div class="field"><label for="fA">Franchise A</label><select id="fA"><option>300</option><option>500</option><option>1000</option><option>1500</option><option>2000</option><option>2500</option></select></div>
+      <div class="field"><label for="pA">Prime mensuelle A</label><input id="pA" type="number" min="0" step="0.05" inputmode="decimal"></div>
+      <div class="field"><label for="fB">Franchise B</label><select id="fB"><option>300</option><option>500</option><option>1000</option><option>1500</option><option>2000</option><option selected>2500</option></select></div>
+      <div class="field"><label for="pB">Prime mensuelle B</label><input id="pB" type="number" min="0" step="0.05" inputmode="decimal"></div>
+      <div class="field full"><label for="fCosts">Frais médicaux prévus / an</label><input id="fCosts" type="number" min="0" step="10" inputmode="decimal"></div>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="btn primary" onclick="compareFranchise()">🏥 Comparer</button>
+      <button type="button" class="btn danger" onclick="clearFranchise()">🗑️ Effacer</button>
+    </div>
+    <div id="fResult" aria-live="polite"></div>
+  </div>
+  <div class="section">
+    <div class="section-title">💼 Salaire brut → net</div>
+    <div class="form-grid">
+      <div class="field full"><label for="gross">Salaire brut mensuel (CHF)</label><input id="gross" type="number" min="0" step="10" inputmode="decimal"></div>
+      <div class="field"><label for="lppPct">LPP (%)</label><input id="lppPct" type="number" min="0" step="0.1" value="5"></div>
+      <div class="field"><label for="aanpPct">AANP (%)</label><input id="aanpPct" type="number" min="0" step="0.1" value="1"></div>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="btn primary" onclick="calcNet()">💼 Calculer</button>
+      <button type="button" class="btn danger" onclick="clearNet()">🗑️ Effacer</button>
+    </div>
+    <div id="netResult" aria-live="polite"></div>
+  </div>
+  <div class="section">
+    <div class="section-title">✉️ Lettres types</div>
+    <div class="form-grid">
+      <div class="field full"><label for="lType">Modèle</label><select id="lType"><option value="bail">Résiliation de bail</option><option value="assurance">Résiliation d'assurance</option><option value="amende">Contestation d'amende</option><option value="delai">Demande de délai de paiement</option><option value="lamal">Résiliation assurance maladie</option><option value="loyer">Demande de baisse de loyer</option></select></div>
+      <div class="field"><label for="lName">Votre nom</label><input id="lName" type="text" autocomplete="name"></div>
+      <div class="field"><label for="lAddr">Votre adresse</label><input id="lAddr" type="text" autocomplete="street-address"></div>
+      <div class="field full"><label for="lTo">Destinataire</label><input id="lTo" type="text"></div>
+      <div class="field full"><label for="lDetail">Précisions (facultatif)</label><input id="lDetail" type="text"></div>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="btn primary" onclick="makeLetter()">✉️ Générer</button>
+      <button type="button" class="btn" onclick="copyLetter()">📋 Copier</button>
+      <button type="button" class="btn blue" onclick="printLetter()">🖨️ Imprimer</button>
+      <button type="button" class="btn danger" onclick="clearLetter()">🗑️ Effacer</button>
+    </div>
+    <div id="lOut" class="letter-preview" aria-live="polite"></div>
+  </div>
+</div></section>
+
+<section id="panel-favorites" class="panel" data-title="⭐ Mes favoris"><div class="panel-body">
+  <div id="favoritesList"></div>
+  <div class="btn-row"><button type="button" class="btn danger" onclick="clearFavorites()">🗑️ Supprimer tous les favoris</button></div>
+</div></section>
+
+<section id="panel-settings" class="panel" data-title="⚙️ Paramètres"><div class="panel-body">
+  <div class="section">
+    <div class="section-title">💾 Données locales</div>
+    <p class="small">Les informations saisies sont enregistrées uniquement dans votre navigateur.</p>
+    <div class="btn-row">
+      <button type="button" class="btn danger" onclick="restoreApp()">↩️ Restaurer</button>
+      <button type="button" class="btn" onclick="exportData()">📋 Copier mes données</button>
+      <button type="button" class="btn danger" onclick="clearAllData()">🗑️ Tout effacer</button>
+    </div>
+    <div id="settingsResult" aria-live="polite"></div>
+  </div>
+</div></section>
+
+</main>
+
+<nav class="bottom-nav">
+  <button type="button" id="nav-home" onclick="goHome()"><span>🏠</span>Accueil</button>
+  <button type="button" id="nav-assistant" onclick="openPanel('assistant')"><span>🤖</span>Assistant</button>
+  <button type="button" id="nav-scam" onclick="openPanel('scam')"><span>🛡️</span>Scam</button>
+  <button type="button" id="nav-housing" onclick="openPanel('housing')"><span>🏘️</span>Logement</button>
+  <button type="button" id="nav-favorites" onclick="openPanel('favorites')"><span>⭐</span>Favoris</button>
+</nav>
+
+<div id="toast" class="toast"></div>
+<div id="modal" class="modal hidden">
+  <div class="modal-box">
+    <div id="modalTitle" class="section-title"></div>
+    <div id="modalBody"></div>
+    <div class="btn-row">
+      <button type="button" id="modalOk" class="btn primary">OK</button>
+      <button type="button" id="modalCancel" class="btn">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.0/dist/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+    <script>
+"use strict";
+
+const $ = id => document.getElementById(id);
+const STORAGE_KEY = "helvetiaTools_v1";
+const OLD_KEYS = ["swissLifeAI_v8", "swissLifeAI_v7"];
+
+const MODULES = {
+  assistant:["🤖","Assistant","Trouvez rapidement le bon outil."],
+  documents:["📄","Documents","Suivez vos documents et démarches."],
+  scam:["🛡️","Scam Shield","Analysez SMS, e-mails, photos, QR et PDF."],
+  phone:["📞","Numéro suisse","Vérifiez et recherchez un numéro."],
+  company:["🏢","Entreprise suisse","Recherche Google, Zefix et local.ch."],
+  money:["💰","Argent & finances","Budget, factures, abonnements et aides."],
+  housing:["🏠","Logement","Préparez et recherchez votre logement."],
+  family:["👨‍👩‍👧‍👦","Famille","Liste familiale et tâches importantes."],
+  admin:["🇨🇭","Administration","Accès aux principaux services suisses."],
+  calendar:["📅","Échéances","Dates clés, rappels et agenda."],
+  life:["🧭","Parcours de vie","Déménagement, naissance, emploi…"],
+  health:["🏥","Assurance maladie","Primes 2027, délai et résiliation."],
+  rent:["⚖️","Contrôleur de loyer","Baisse de loyer et taux de référence."],
+  tools:["🧰","Outils suisses","QR-facture, IBAN, AVS, lettres types."]
+};
+
+const MONEY_FIELDS = [["income","Revenus"],["rent","Loyer"],["insurance","Assurance"],["food","Nourriture"],["transport","Transport"],["bills","Factures"],["subscriptions","Abonnements"],["other","Autres dépenses"]];
+
+const CHECKLIST = ["Carte d'identité / passeport","Permis de séjour si nécessaire","Attestation d'assurance maladie","Certificat de salaire / revenus","Dernier avis de taxation","Extrait du registre des poursuites","Contrat de travail / justificatif de revenus","Documents bancaires","Documents du logement","Documents importants des enfants"];
+
+const DEFAULT_DATA = {
+  favorites:[], numbers:[], money:{}, housing:{}, rent:null, health:{}, swissOv:{}, applications:[],
+  family:[{text:"Documents scolaires",done:false,due:""},{text:"Rendez-vous importants",done:false,due:""},{text:"Activités des enfants",done:false,due:""},{text:"Démarches familiales",done:false,due:""}],
+  documents:[{text:"Courrier important",done:false,due:""},{text:"Factures",done:false,due:""},{text:"Documents administratifs",done:false,due:""},{text:"Documents scolaires",done:false,due:""}]
+};
+
+const link = (icon,label,sub,url) => ({icon,label,sub,module:"admin",direct:true,run:()=>openExternal(url)});
+
+/* ---------- CORRIGÉ : Boutons téléphone utiles (NCSC + antiphishing.ch) ---------- */
+const ACTIONS = {
+  phoneLocal:{icon:"📞",label:"local.ch",sub:"Annuaire commercial",module:"phone",run:()=>phoneSearch("local")},
+  phoneSearch:{icon:"🔎",label:"search.ch",sub:"Annuaire inversé suisse",module:"phone",run:()=>phoneSearch("searchch")},
+  phoneGoogle:{icon:"🛡️",label:"NCSC — Signalement",sub:"Centre national cybersécurité suisse",module:"phone",run:()=>openExternal("https://www.ncsc.admin.ch/ncsc/fr/home.html")},
+  phoneReports:{icon:"🚩",label:"Antiphishing.ch",sub:"Signaler un SMS ou e-mail suspect",module:"phone",run:()=>openExternal("https://antiphishing.ch/fr/")},
+  coLocal:{icon:"📞",label:"local.ch",sub:"Fiche et coordonnées",module:"company",run:()=>companySearch("local")},
+  coGoogle:{icon:"🌐",label:"Google",sub:"Nom + Suisse",module:"company",run:()=>companySearch("google")},
+  coZefix:{icon:"🏢",label:"Zefix",sub:"Registre du commerce",module:"company",run:()=>companySearch("zefix")},
+  hGoogle:{icon:"🌐",label:"Google",sub:"Avec vos critères",module:"housing",direct:true,run:searchHousingGoogle},
+  hHomegate:{icon:"🏠",label:"Homegate",module:"housing",direct:true,run:()=>housingPortal("Homegate","https://www.homegate.ch/louer/recherche-immobiliere")},
+  hImmo:{icon:"🏢",label:"ImmoScout24",module:"housing",direct:true,run:()=>housingPortal("ImmoScout24","https://www.immoscout24.ch/fr")},
+  hComparis:{icon:"🔎",label:"Comparis",module:"housing",direct:true,run:()=>housingPortal("Comparis","https://fr.comparis.ch/immobilien/marktplatz/mieten")},
+  hPriminfo:{icon:"🏥",label:"priminfo.admin.ch",sub:"Primes officielles de la Confédération",module:"health",direct:true,run:()=>openExternal("https://www.priminfo.admin.ch")},
+  rRate:{icon:"⚖️",label:"tauxdereference.admin.ch",sub:"Taux de référence officiel (OFL)",module:"rent",direct:true,run:()=>openExternal("https://www.tauxdereference.admin.ch")},
+  hSubsidized:{icon:"🏛️",label:"Logements subventionnés Vaud",sub:"Site officiel",module:"housing",direct:true,run:openSubsidizedHousing},
+  aChch:link("🇨🇭","ch.ch","Portail officiel suisse","https://www.ch.ch/fr/"),
+  aAdmin:link("🏛️","admin.ch","Confédération suisse","https://www.admin.ch/gov/fr/accueil.html"),
+  aVd:link("🏛️","Canton de Vaud","Portail officiel du canton","https://www.vd.ch/"),
+  aZefix:link("🏢","Zefix","Registre central des entreprises","https://www.zefix.ch/fr/search/entity/welcome"),
+  aPost:link("📮","La Poste","Services postaux suisses","https://www.post.ch/fr"),
+  aBsv:link("🛡️","Assurances sociales","Informations officielles","https://www.bsv.admin.ch/bsv/fr/home.html")
+};
+
+let appData = loadData();
+let cameraStream = null, lastScamImage = null, assistantCompany = "";
+let lastRent = null, lastBill = null, billStream = null, billTimer = null;
+let lastQr = null, calItems = [], toastTimer = null;
+
+const escapeHtml = (() => {
+  const cache = new Map();
+  return function(v){
+    const s = String(v ?? "");
+    if(cache.has(s)) return cache.get(s);
+    const out = s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");
+    if(cache.size > 500) cache.clear();
+    cache.set(s, out);
+    return out;
+  };
+})();
+
+function escapeAttr(v){ return escapeHtml(v).replace(/`/g,"&#096;"); }
+function normalizeText(v){ return String(v || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,""); }
+function isoLocal(d){ return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
+function todayStr(){ return isoLocal(new Date()); }
+function addDays(iso, n){ const d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() + n); return isoLocal(d); }
+function fmtDate(s){ if(!s || typeof s !== "string") return ""; const p = s.split("-"); return p.length !== 3 ? s : p[2] + "." + p[1] + "." + p[0]; }
+function fmtDateLong(s){
+  if(!s) return "";
+  const m = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
+  const p = s.split("-");
+  return p.length !== 3 ? s : parseInt(p[2],10) + " " + m[parseInt(p[1],10)-1] + " " + p[0];
+}
+
+const formatCHF = (() => {
+  const fmt = new Intl.NumberFormat("fr-CH", {minimumFractionDigits:2, maximumFractionDigits:2});
+  return v => fmt.format(v) + " CHF";
+})();
+
+function openExternal(url){ window.open(url, "_blank", "noopener,noreferrer"); }
+function copyQuiet(text){ if(!navigator.clipboard) return; navigator.clipboard.writeText(text).catch(e => console.warn(e)); }
+
+async function copyText(text){
+  try{ await navigator.clipboard.writeText(text); showToast("Copié dans le presse-papiers"); }
+  catch(err){
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.setAttribute("readonly","");
+    ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand("copy"); showToast("Copié"); }catch(e){ showToast("Copie impossible"); }
+    ta.remove();
+  }
+}
+
+function showToast(msg){
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 2500);
+}
+
+function cloneDefault(){ return JSON.parse(JSON.stringify(DEFAULT_DATA)); }
+
+function loadData(){
+  try{
+    let raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw){ for(const k of OLD_KEYS){ raw = localStorage.getItem(k); if(raw) break; } }
+    return raw ? JSON.parse(raw) : cloneDefault();
+  }catch(e){ return cloneDefault(); }
+}
+
+function ensureData(){
+  if(!appData || typeof appData !== "object") appData = cloneDefault();
+  const d = cloneDefault();
+  if(!Array.isArray(appData.favorites)) appData.favorites = [];
+  appData.favorites = appData.favorites.filter(favInfo);
+  if(!Array.isArray(appData.numbers)) appData.numbers = [];
+  if(!appData.money || typeof appData.money !== "object") appData.money = {};
+  if(!appData.housing || typeof appData.housing !== "object") appData.housing = {};
+  if(!appData.health || typeof appData.health !== "object") appData.health = {};
+  if(!appData.swissOv || typeof appData.swissOv !== "object") appData.swissOv = {};
+  ["family","documents","applications"].forEach(k => { if(!Array.isArray(appData[k])) appData[k] = d[k]; });
+  saveData();
+}
+
+function saveData(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(appData)); }catch(e){ console.error(e); } }
+
+function buildUI(){
+  $("homeGrid").innerHTML = Object.entries(MODULES).map(([k,m]) => `
+    <div class="card">
+      <button type="button" class="card-main" onclick="openPanel('${k}')">
+        <div class="card-icon">${m[0]}</div><h3>${m[1]}</h3><p>${m[2]}</p>
+      </button>
+      <button type="button" class="star-home" data-fav="${k}" onclick="toggleFavorite('${k}')" aria-label="Ajouter aux favoris">☆</button>
+    </div>`).join("");
+
+  document.querySelectorAll(".panel").forEach(p => {
+    if(p.querySelector(".panel-header")) return;
+    const k = p.id.slice(6), m = MODULES[k];
+    const title = m ? m[0] + " " + m[1] : p.dataset.title;
+    p.insertAdjacentHTML("afterbegin", `
+      <div class="panel-header"><h2>${title}</h2>
+        <div class="panel-actions">
+          ${m ? `<button type="button" class="favorite-panel-btn" data-favpanel="${k}" onclick="toggleFavorite('${k}')">☆ Ajouter</button>` : ""}
+          <button type="button" class="close-btn" onclick="closePanels()" aria-label="Fermer">×</button>
+        </div>
+      </div>`);
+  });
+
+  $("moneyForm").innerHTML = MONEY_FIELDS.map(([k,l]) =>
+    `<div class="field"><label for="money_${k}">${escapeHtml(l)} CHF</label><input id="money_${k}" type="number" min="0" step="0.05" inputmode="decimal"></div>`).join("");
+
+  document.querySelectorAll(".actions").forEach(c => {
+    c.innerHTML = c.dataset.ids.split(",").map(id => {
+      const a = ACTIONS[id];
+      return `<div class="act">
+        <button type="button" class="btn act-main" onclick="ACTIONS['${id}'].run()">${a.icon} ${escapeHtml(a.label)}${a.sub ? `<small>${escapeHtml(a.sub)}</small>` : ""}</button>
+        <button type="button" class="act-star" data-fav="act:${id}" onclick="toggleFavorite('act:${id}')" aria-label="Ajouter aux favoris">☆</button>
+      </div>`;
+    }).join("");
+  });
+}
+
+function closePanels(){
+  stopCamera(); stopBillCam();
+  document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+  $("homeSection").style.display = "block";
+  updateBottomNav("home");
+}
+
+function goHome(){ closePanels(); window.scrollTo({top:0,behavior:"smooth"}); }
+
+function openPanel(name){
+  stopCamera(); stopBillCam();
+  $("homeSection").style.display = "none";
+  document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+  const panel = $("panel-" + name); if(panel) panel.classList.add("active");
+  updateBottomNav(name); window.scrollTo({top:0,behavior:"smooth"});
+  if(name === "company") clearCompany();
+  if(name === "phone") clearPhone();
+  if(name === "favorites") renderFavorites();
+  if(name === "calendar") renderCalendar();
+  if(name === "family" || name === "documents") renderList(name);
+}
+
+function updateBottomNav(active){
+  if(active === "home") renderToday();
+  document.querySelectorAll(".bottom-nav button").forEach(b => b.classList.remove("active"));
+  const nav = $("nav-" + active); if(nav) nav.classList.add("active");
+}
+
+function favInfo(key){
+  if(String(key).startsWith("act:")){
+    const a = ACTIONS[key.slice(4)];
+    return a ? {icon:a.icon, label:a.label, sub:MODULES[a.module][1]} : null;
+  }
+  const m = MODULES[key];
+  return m ? {icon:m[0], label:m[1], sub:""} : null;
+}
+
+function toggleFavorite(key){
+  const info = favInfo(key); if(!info) return;
+  const i = appData.favorites.indexOf(key);
+  if(i >= 0){ appData.favorites.splice(i,1); showToast(info.label + " retiré des favoris"); }
+  else { appData.favorites.push(key); showToast(info.label + " ajouté aux favoris"); }
+  saveData(); refreshFavorites();
+}
+
+function refreshFavorites(){
+  renderFavorites();
+  document.querySelectorAll("[data-fav]").forEach(b => {
+    const on = appData.favorites.includes(b.dataset.fav);
+    b.textContent = on ? "★" : "☆"; b.classList.toggle("on", on);
+  });
+  document.querySelectorAll("[data-favpanel]").forEach(b => {
+    const on = appData.favorites.includes(b.dataset.favpanel);
+    b.textContent = on ? "★ Favori" : "☆ Ajouter"; b.classList.toggle("on", on);
+  });
+}
+
+function renderFavorites(){
+  const c = $("favoritesList");
+  if(!appData.favorites.length){ c.innerHTML = `<div class="empty">⭐ Aucun favori pour le moment.<br><br>Appuyez sur ☆ à côté d'une fonction pour le retrouver ici.</div>`; return; }
+  c.innerHTML = `<div class="list">${appData.favorites.map(k => {
+    const i = favInfo(k);
+    return `<div class="item">
+      <button type="button" class="open" onclick="openFavorite('${escapeAttr(k)}')"><strong>${i.icon} ${escapeHtml(i.label)}</strong>${i.sub ? `<span class="badge">${escapeHtml(i.sub)}</span>` : ""}</button>
+      <button type="button" class="rm" onclick="toggleFavorite('${escapeAttr(k)}')" aria-label="Retirer">×</button></div>`;
+  }).join("")}</div>`;
+}
+
+function openFavorite(key){
+  if(key.startsWith("act:")){
+    const a = ACTIONS[key.slice(4)]; if(!a) return;
+    if(a.direct){ a.run(); return; }
+    openPanel(a.module); showToast("Saisissez la valeur puis relancez la recherche"); return;
+  }
+  openPanel(key);
+}
+
+async function clearFavorites(){
+  if(!await uiConfirm("Supprimer tous les favoris ?", "Supprimer")) return;
+  appData.favorites = []; saveData(); refreshFavorites(); showToast("Favoris supprimés");
+}
+
+const RULES = [
+  ["phone", /numero|telephone|portable|appel|\+41|\b0\d{2}[\s.]?\d{3}/],
+  ["scam", /arnaque|scam|suspect|phishing|sms|e-?mail|lien/],
+  ["housing", /logement|appartement|maison|loyer|duplex|studio/],
+  ["rent", /baisse de loyer|taux de reference|\bbail\b|controleur/],
+  ["health", /assurance maladie|lamal|caisse maladie|prime|franchise/],
+  ["money", /budget|argent|finance|facture|abonnement/],
+  ["family", /famille|enfant/],
+  ["documents", /document|papier|courrier/],
+  ["admin", /administration|canton|commune|permis|impot/],
+  ["company", /entreprise|societe|firma|employeur/]
+];
+
+function detectModule(text){ const t = normalizeText(text); const r = RULES.find(([,re]) => re.test(t)); return r ? r[0] : null; }
+function cleanCompany(text){ return text.replace(/\b(rechercher|chercher|recherche|trouver|entreprise|société|societe|firma)\b/gi,"").replace(/\s+/g," ").trim(); }
+
+function routeTo(module, raw){
+  openPanel(module);
+  if(module === "phone"){ const p = extractSwissPhone(raw); if(p) $("phoneInput").value = formatSwissPhone(p); }
+  if(module === "scam") $("scamText").value = raw;
+  if(module === "company") $("companyInput").value = cleanCompany(raw);
+}
+
+function globalSearch(){
+  const raw = $("globalSearchInput").value.trim();
+  if(!raw){ showToast("Écrivez ce que vous recherchez"); return; }
+  const m = detectModule(raw);
+  if(m) routeTo(m, raw);
+  else { openPanel("assistant"); $("assistantInput").value = raw; analyzeAssistant(); }
+}
+
+function analyzeAssistant(){
+  const raw = $("assistantInput").value.trim();
+  const result = $("assistantResult");
+  if(!raw){ result.innerHTML = `<div class="result warning">Écrivez votre demande.</div>`; return; }
+  const m = detectModule(raw);
+  if(m && m !== "company"){
+    const info = MODULES[m];
+    result.innerHTML = `<div class="result success"><strong>${info[0]} ${info[1]}</strong><br>Cette fonction correspond à votre demande.
+      <div class="btn-row"><button type="button" class="btn primary" onclick="routeTo('${m}', $('assistantInput').value)">Ouvrir</button></div></div>`;
+    return;
+  }
+  assistantCompany = cleanCompany(raw) || raw;
+  result.innerHTML = `<div class="result success"><strong>🏢 Rechercher « ${escapeHtml(assistantCompany)} »</strong><br>Lancez directement la recherche :
+    <div class="btn-row">
+      <button type="button" class="btn primary" onclick="quickCompany('zefix')">🏢 Zefix (officiel)</button>
+      <button type="button" class="btn" onclick="quickCompany('local')">📞 local.ch</button>
+      <button type="button" class="btn" onclick="quickCompany('google')">🌐 Google</button>
+      <button type="button" class="btn blue" onclick="routeTo('company', $('assistantInput').value)">Ouvrir Entreprise</button>
+    </div>
+    <div class="small" style="margin-top:8px">Astuce : Zefix est le registre officiel suisse.</div></div>`;
+}
+
+function quickCompany(kind){ const name = assistantCompany; if(!name) return; openExternal(companyUrl(kind, name)); if(kind === "zefix") copyQuiet(name); }
+
+function normalizePhone(value){
+  let p = String(value || "").replace(/[^\d+]/g,"");
+  if(p.startsWith("0041")) p = "+41" + p.slice(4);
+  if(p.startsWith("41") && !p.startsWith("+41")) p = "+" + p;
+  if(p.startsWith("0") && p.length >= 9) p = "+41" + p.slice(1);
+  return p;
+}
+
+function formatSwissPhone(phone){
+  const d = normalizePhone(phone).replace(/\D/g,"");
+  if(d.startsWith("41") && d.length === 11){
+    const n = d.slice(2);
+    return `+41 ${n.slice(0,2)} ${n.slice(2,5)} ${n.slice(5,7)} ${n.slice(7,9)}`;
+  }
+  return normalizePhone(phone);
+}
+
+function validSwissDigits(raw){ const d = normalizePhone(raw).replace(/\D/g,""); return d.startsWith("41") && d.length === 11 ? d : ""; }
+function extractSwissPhone(text){ const m = String(text || "").match(/(?:\+41|0041|0)\s*(?:\d[\s.-]*){8,}/); return m ? normalizePhone(m[0]) : ""; }
+
+function checkPhone(){
+  const raw = $("phoneInput").value.trim();
+  const result = $("phoneResult");
+  if(!raw){ result.innerHTML = `<div class="result warning">Entrez un numéro de téléphone.</div>`; return; }
+  const d = validSwissDigits(raw);
+  if(!d){ result.innerHTML = `<div class="result danger">❌ Numéro suisse non reconnu.<br><br>Exemple valide : <strong>+41 79 870 54 31</strong></div>`; return; }
+  const prefix = d.slice(2,4);
+  let type = "Numéro fixe ou service suisse";
+  if(["74","75","76","77","78","79"].includes(prefix)) type = "Téléphone mobile suisse";
+  else if(prefix === "71") type = "Numéro fixe / service régional";
+  const formatted = formatSwissPhone(raw); $("phoneInput").value = formatted;
+  result.innerHTML = `<div class="result success"><strong>🇨🇭 Numéro suisse reconnu</strong>
+    <div class="row">🟢 Numéro : <strong>${escapeHtml(formatted)}</strong></div>
+    <div class="row">🟢 Pays : Suisse</div>
+    <div class="row">🟢 Préfixe : +41 ${prefix}</div>
+    <div class="row">🟢 Type : ${escapeHtml(type)}</div>
+    <div class="row">🟢 Format : reconnu</div>
+    <div class="btn-row"><button type="button" class="btn primary" onclick="copyText($('phoneInput').value)">📋 Copier</button></div></div>`;
+}
+
+function phoneSearch(kind){
+  const raw = $("phoneInput").value.trim();
+  const d = validSwissDigits(raw);
+  if(!d){ showToast("Entrez d'abord un numéro suisse valide"); return; }
+  const local = "0" + d.slice(2);
+  const formatted = formatSwissPhone(raw);
+  if(kind === "local") openExternal("https://www.local.ch/fr/q?what=" + encodeURIComponent(local));
+  if(kind === "searchch") openExternal("https://search.ch/tel/?was=" + encodeURIComponent(local));
+  copyQuiet(local);
+}
+
+function clearPhone(){ $("phoneInput").value = ""; $("phoneResult").innerHTML = ""; }
+
+const NUM_LABELS = {connu:"✅ Connu", suspect:"🚩 Suspect", surveiller:"👀 À surveiller"};
+
+async function saveNumber(label){
+  const raw = $("phoneInput").value.trim();
+  if(!raw){ showToast("Saisissez d'abord un numéro"); return; }
+  const num = validSwissDigits(raw) ? formatSwissPhone(raw) : raw;
+  const res = await uiForm("Enregistrer « " + NUM_LABELS[label] + " »", [{text:num},{label:"Note (facultatif)"}]);
+  if(!res) return;
+  appData.numbers = (appData.numbers || []).filter(n => n.num !== num);
+  appData.numbers.unshift({num, label, note:res[1] || "", date:todayStr()});
+  saveData(); renderNumbers(); showToast("Numéro enregistré");
+}
+
+function renderNumbers(){
+  const c = $("numbersList");
+  const list = appData.numbers || [];
+  c.innerHTML = list.length ? `<div class="list">${list.map((n,i) => `<div class="item">
+    <button type="button" class="open" onclick="$('phoneInput').value='${escapeAttr(n.num)}';checkPhone();window.scrollTo({top:0,behavior:'smooth'})"><strong>${escapeHtml(n.num)}</strong>
+      <span class="badge">${NUM_LABELS[n.label] || ""} · ${fmtDate(n.date)}${n.note ? " · " + escapeHtml(n.note) : ""}</span></button>
+    <button type="button" class="rm" onclick="removeNumber(${i})" aria-label="Supprimer">×</button></div>`).join("")}</div>` : `<div class="empty">Aucun numéro enregistré.</div>`;
+}
+
+function removeNumber(i){ appData.numbers.splice(i,1); saveData(); renderNumbers(); }
+
+function getCompany(){ return $("companyInput").value.trim(); }
+
+function companyUrl(kind, name){
+  const q = encodeURIComponent(name);
+  if(kind === "local") return "https://www.local.ch/fr/q?what=" + q;
+  if(kind === "zefix") return "https://www.zefix.admin.ch/fr/search/entity/list?name=" + q;
+  return "https://www.google.com/search?q=" + encodeURIComponent(name + " Suisse");
+}
+
+/* ---------- CORRIGÉ : recherche entreprise va sur Zefix (officiel) ---------- */
+function checkCompany(){
+  const name = getCompany();
+  if(!name){ $("companyResult").innerHTML = `<div class="result warning">Entrez le nom d'une entreprise.</div>`; return; }
+  openExternal(companyUrl("zefix", name));
+  $("companyResult").innerHTML = `<div class="result success">🏢 Zefix (registre officiel suisse) ouvert pour « ${escapeHtml(name)} ».<br>Vous pouvez aussi essayer local.ch ou Google ci-dessous.</div>`;
+}
+
+function companySearch(kind){
+  const name = getCompany();
+  if(!name){ showToast("Entrez d'abord le nom d'une entreprise"); return; }
+  openExternal(companyUrl(kind, name));
+  if(kind === "zefix") copyQuiet(name);
+}
+
+function clearCompany(){ $("companyInput").value = ""; $("companyResult").innerHTML = ""; }
+
+function renderMoney(){ MONEY_FIELDS.forEach(([k]) => { $("money_" + k).value = appData.money[k] ?? ""; }); }
+
+function getMoneyValues(){
+  const v = {};
+  MONEY_FIELDS.forEach(([k]) => { const n = parseFloat($("money_" + k).value); v[k] = Number.isFinite(n) ? n : 0; });
+  return v;
+}
+
+function calculateMoney(){
+  const v = getMoneyValues();
+  const expenses = v.rent + v.insurance + v.food + v.transport + v.bills + v.subscriptions + v.other;
+  const balance = v.income - expenses;
+  const cls = balance < 0 ? "danger" : balance < 300 ? "warning" : "success";
+  $("moneyResult").innerHTML = `<div class="result ${cls}"><strong>📊 Résultat mensuel</strong><br><br>
+    Revenus : <strong>${formatCHF(v.income)}</strong><br>
+    Dépenses : <strong>${formatCHF(expenses)}</strong><br>
+    Solde : <strong>${formatCHF(balance)}</strong><br><br>
+    ${balance >= 0 ? "✅ Votre budget est positif." : "⚠️ Vos dépenses dépassent vos revenus."}</div>` + moneyBars(v);
+}
+
+function saveMoney(){ appData.money = getMoneyValues(); saveData(); calculateMoney(); showToast("Budget enregistré"); }
+function clearMoney(){ appData.money = {}; saveData(); renderMoney(); $("moneyResult").innerHTML = ""; showToast("Budget effacé"); }
+
+function moneyBars(v){
+  if(!v.income) return "";
+  const labels = {rent:"Loyer",insurance:"Assurance",food:"Nourriture",transport:"Transport",bills:"Factures",subscriptions:"Abonnements",other:"Autres"};
+  return `<div class="result" style="background:var(--card);border:1px solid var(--border)"><strong>📊 Part du revenu</strong>${Object.keys(labels).filter(k => v[k] > 0).map(k => {
+    const pct = Math.round(v[k] / v.income * 100);
+    return `<div style="margin-top:9px"><div class="small" style="display:flex;justify-content:space-between"><span>${labels[k]}</span><span>${formatCHF(v[k])} · ${pct} %</span></div>
+      <div style="height:9px;background:#eef0f2;border-radius:6px;overflow:hidden"><div style="height:100%;width:${Math.min(100,pct)}%;background:${k === "rent" && pct > 33 ? "var(--red)" : "var(--blue)"}"></div></div></div>`;
+  }).join("")}<div class="small" style="margin-top:8px">Le loyer apparaît en rouge s'il dépasse environ un tiers du revenu.</div></div>`;
+}
+
+const HOUSING_IDS = {place:"housingPlace",canton:"housingCanton",type:"housingType",rooms:"housingRooms",maxRent:"housingMaxRent",availability:"housingAvailability"};
+
+function getHousing(){
+  const h = {};
+  Object.entries(HOUSING_IDS).forEach(([k,id]) => { h[k] = $(id).value.trim(); });
+  h.subsidized = $("housingSubsidized").checked;
+  return h;
+}
+
+function toggleSubsidy(){ $("subsidyBox").classList.toggle("hidden", !$("housingSubsidized").checked); }
+
+function renderHousing(){
+  const h = appData.housing || {};
+  Object.entries(HOUSING_IDS).forEach(([k,id]) => { $(id).value = h[k] || ""; });
+  $("housingSubsidized").checked = !!h.subsidized;
+  toggleSubsidy();
+  const q = buildHousingQuery();
+  $("housingSavedResult").innerHTML = q ? `<div class="result success">✅ Recherche enregistrée<br>${escapeHtml(q)}</div>` : "";
+}
+
+function saveHousing(show = true){ appData.housing = getHousing(); saveData(); renderHousing(); if(show) showToast("Recherche logement enregistrée"); }
+function clearHousing(){ appData.housing = {}; saveData(); renderHousing(); $("housingSearchResult").innerHTML = ""; showToast("Recherche logement effacée"); }
+
+function buildHousingQuery(){
+  const h = getHousing(), p = [];
+  if(h.place) p.push(h.place);
+  if(h.canton) p.push("canton " + h.canton);
+  if(h.type) p.push(h.type);
+  if(h.rooms) p.push(h.rooms + " pièces minimum");
+  if(h.maxRent) p.push("loyer maximum " + h.maxRent + " CHF");
+  if(h.availability) p.push("disponibilité " + h.availability);
+  if(h.subsidized) p.push("logement subventionné");
+  return p.join(" | ");
+}
+
+function copyHousingCriteria(){ const q = buildHousingQuery(); if(!q){ showToast("Remplissez au moins un critère"); return; } copyText(q); }
+
+function housingPortal(name, url){
+  const q = buildHousingQuery();
+  if(!q){ showToast("Remplissez d'abord vos critères"); return; }
+  saveHousing(false); openExternal(url); copyQuiet(q);
+  $("housingSearchResult").innerHTML = `<div class="result success"><strong>🔎 ${escapeHtml(name)} ouvert</strong><br><br>${escapeHtml(q)}<br><br>📋 Critères copiés : collez-les dans la recherche du portail.</div>`;
+}
+
+function searchHousingGoogle(){
+  const q = buildHousingQuery();
+  if(!q){ showToast("Remplissez d'abord vos critères"); return; }
+  saveHousing(false);
+  const g = "logement location Suisse " + q.replace(/\|/g," ");
+  openExternal("https://www.google.com/search?q=" + encodeURIComponent(g));
+  $("housingSearchResult").innerHTML = `<div class="result info">🌐 Google recherche :<br><strong>${escapeHtml(g)}</strong></div>`;
+}
+
+function openSubsidizedHousing(){
+  const place = $("housingPlace").value.trim();
+  saveHousing(false);
+  openExternal("https://www.vd.ch/territoire-et-construction/logement/aides-et-subventions/logements-subventionnes-aide-a-la-pierre/trouver-un-logement");
+  $("housingSearchResult").innerHTML = `<div class="result info">🏛️ Page des logements subventionnés de Vaud ouverte.<br>${place ? "Commune recherchée : <strong>" + escapeHtml(place) + "</strong>" : "Cherchez votre commune sur le site."}</div>`;
+}
+
+function renderList(key){
+  const c = $(key + "List");
+  const items = appData[key] || [];
+  if(!items.length){ c.innerHTML = `<div class="empty">Liste vide. Appuyez sur « Ajouter ».</div>`; return; }
+  const done = items.filter(i => i.done).length;
+  c.innerHTML = `<p class="small" style="margin-bottom:8px">${done} / ${items.length} terminé(s)</p><div class="list">${items.map((it,i) => {
+    const late = it.due && !it.done && it.due < todayStr();
+    return `<div class="item"><label><input type="checkbox" ${it.done ? "checked" : ""} onchange="toggleItem('${key}',${i})">
+      <span><span class="${it.done ? "done" : ""}">${escapeHtml(it.text)}</span>
+      ${it.due ? `<span class="badge ${late ? "late" : ""}">${late ? "⚠️ En retard : " : "📅 Échéance : "}${fmtDate(it.due)}</span>` : ""}</span></label>
+      <button type="button" onclick="removeItem('${key}',${i})" aria-label="Supprimer">×</button></div>`;
+  }).join("")}</div>`;
+}
+
+async function addItem(key){
+  const title = key === "documents" ? "Nouveau document" : key === "applications" ? "Nouvelle candidature" : "Nouvelle tâche";
+  const res = await uiForm(title, [{label:"Nom"},{label:"Échéance (facultatif)", type:"date"}]);
+  if(!res || !res[0]) return;
+  appData[key].push({text:res[0], done:false, due:res[1] || ""});
+  saveData(); renderList(key);
+}
+
+function toggleItem(key,i){ if(appData[key][i]){ appData[key][i].done = !appData[key][i].done; saveData(); renderList(key); } }
+function removeItem(key,i){ appData[key].splice(i,1); saveData(); renderList(key); }
+
+async function clearList(key){
+  if(!await uiConfirm("Effacer toute la liste ?", "Effacer")) return;
+  appData[key] = []; saveData(); renderList(key);
+}
+
+function addChecklist(){
+  const have = appData.documents.map(d => d.text);
+  const add = CHECKLIST.filter(t => !have.includes(t));
+  add.forEach(text => appData.documents.push({text, done:false, due:""}));
+  saveData(); renderList("documents");
+  showToast(add.length ? add.length + " document(s) ajouté(s)" : "Checklist déjà complète");
+}
+
+function copyList(key){
+  const items = appData[key];
+  if(!items.length){ showToast("Liste vide"); return; }
+  copyText(items.map(i => (i.done ? "[x] " : "[ ] ") + i.text + (i.due ? " (" + fmtDate(i.due) + ")" : "")).join("\n"));
+}
+
+async function startCamera(){
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ showToast("Caméra non disponible"); return; }
+  try{
+    cameraStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}, audio:false});
+    $("cameraVideo").srcObject = cameraStream;
+    $("cameraVideo").classList.remove("hidden");
+    $("takePhotoBtn").classList.remove("hidden");
+  }catch(e){ showToast("Caméra bloquée : utilisez « Prendre une photo »"); }
+}
+
+function stopCamera(){
+  if(cameraStream){ cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
+  $("cameraVideo").classList.add("hidden");
+  $("takePhotoBtn").classList.add("hidden");
+}
+
+function takePhoto(){
+  const v = $("cameraVideo"), c = $("cameraCanvas");
+  if(!v.videoWidth){ showToast("La caméra n'est pas prête"); return; }
+  c.width = v.videoWidth; c.height = v.videoHeight;
+  c.getContext("2d").drawImage(v,0,0,c.width,c.height);
+  lastScamImage = c.toDataURL("image/jpeg",.9);
+  $("scamPreview").src = lastScamImage;
+  $("scamPreview").classList.remove("hidden");
+  stopCamera(); showToast("Photo prise");
+}
+
+function handleScamFile(event){
+  const file = event.target.files[0]; if(!file) return;
+  if(file.type.startsWith("image/")){
+    const r = new FileReader();
+    r.onload = e => { lastScamImage = e.target.result; $("scamPreview").src = lastScamImage; $("scamPreview").classList.remove("hidden"); showToast("Photo chargée"); };
+    r.readAsDataURL(file); return;
+  }
+  showToast("Pour un PDF, copiez-collez le texte.");
+}
+
+async function readQR(src){
+  let img;
+  try{ img = new Image(); img.src = src; await img.decode(); }catch(e){ return ""; }
+  if("BarcodeDetector" in window){
+    try{ const found = await new BarcodeDetector({formats:["qr_code"]}).detect(img); if(found.length) return found.map(f => f.rawValue).join("\n"); }catch(e){}
+  }
+  return decodeJsQR(img, img.naturalWidth, img.naturalHeight);
+}
+
+function decodeJsQR(src, w, h, sizes = [1600,1000,2400]){
+  if(typeof jsQR === "undefined" || !w || !h) return "";
+  for(const max of sizes){
+    const k = Math.min(1, max / Math.max(w,h));
+    const c = document.createElement("canvas");
+    c.width = Math.round(w * k); c.height = Math.round(h * k);
+    const ctx = c.getContext("2d", {willReadFrequently:true});
+    ctx.drawImage(src, 0, 0, c.width, c.height);
+    const d = ctx.getImageData(0, 0, c.width, c.height);
+    const code = jsQR(d.data, d.width, d.height, {inversionAttempts:"attemptBoth"});
+    if(code && code.data) return code.data;
+  }
+  return "";
+}
+
+async function extractOCR(){
+  const result = $("scamResult");
+  if(!lastScamImage){ result.innerHTML = `<div class="result warning">Prenez ou choisissez d'abord une photo.</div>`; return; }
+  result.innerHTML = `<div class="result info">🔤 Lecture de l'image en cours...</div>`;
+  const qr = await readQR(lastScamImage);
+  if(qr){ $("scamText").value = "QR code : " + qr; analyzeScamText(); return; }
+  if(typeof Tesseract === "undefined"){ result.innerHTML = `<div class="result danger">Le moteur de lecture n'est pas chargé (connexion requise).</div>`; return; }
+  try{
+    const out = await Tesseract.recognize(lastScamImage, "fra+eng");
+    const text = out.data.text.trim();
+    $("scamText").value = text;
+    if(text) analyzeScamText();
+    else result.innerHTML = `<div class="result warning">Aucun texte ni QR lisible.</div>`;
+  }catch(e){ result.innerHTML = `<div class="result danger">❌ Impossible de lire cette image.</div>`; }
+}
+
+function clearScam(){
+  stopCamera();
+  $("scamText").value = ""; $("scamResult").innerHTML = "";
+  $("scamPreview").classList.add("hidden"); $("scamFile").value = "";
+  lastScamImage = null;
+}
+
+/* ---------- CORRIGÉ : détection d'arnaque améliorée (code SMS, etc.) ---------- */
+function analyzeScamText(){
+  const text = $("scamText").value.trim();
+  const result = $("scamResult");
+  if(!text){ result.innerHTML = `<div class="result warning">Ajoutez un texte à analyser.</div>`; return; }
+  const lower = normalizeText(text);
+  let score = 0; const reasons = [];
+
+  const words = ["urgent","urgence","cliquez","cliquer","mot de passe","password","verification","compte bloque","paiement","payer","remboursement","amende","cadeau","gagne","lotterie","loterie","bitcoin","crypto","virement","iban","carte bancaire","credit card","interpol","police","douane","colis","livraison","facture impayee","suspendu","bloque"];
+  words.forEach(w => { if(lower.includes(w)){ score += 10; reasons.push("Élément typique d'arnaque : « " + w + " »"); } });
+
+  // Détections renforcées code SMS
+  const mentionsCode = /\bcode\b/.test(lower);
+  const mentionsSms = /(sms|texto|telephone|mobile|portable)/.test(lower);
+  const askGive = /(donner|donne|donnez|communiquer|communique|envoyer|envoie|envoyez|partager|partage|transmettre|transmet|confirmer|valider|saisir|saisissez|inscrire|entrer|entrez|taper|tapez|recopier|recopie)/.test(lower);
+
+  if(mentionsCode && mentionsSms){ score += 35; reasons.push("🚨 Demande de code reçu par SMS"); }
+  if(mentionsCode && askGive){ score += 30; reasons.push("🚨 On vous demande de communiquer un code confidentiel"); }
+  if(mentionsCode && mentionsSms && askGive){ score += 25; reasons.push("🚨 ARNAQUE TRÈS PROBABLE : code SMS demandé"); }
+
+  if(/interpol|police|fbi|douane|autorite|justice/i.test(text)){ score += 20; reasons.push("🚨 Usurpation d'autorité (police, douane, Interpol…)"); }
+  if(/votre compte|votre carte|votre colis|votre amende|votre facture/i.test(text)){ score += 15; reasons.push("Prétexte personnel pour vous faire agir"); }
+
+  if(/https?:\/\//i.test(text)){ score += 15; reasons.push("Contient un lien Internet."); }
+  if(/bit\.ly|tinyurl|t\.co|goo\.gl|is\.gd|rebrand\.ly/i.test(text)){ score += 25; reasons.push("Lien raccourci (destination cachée)."); }
+  if(/\+41\s?7\d/.test(text)){ score += 5; reasons.push("Contient un numéro mobile suisse."); }
+  if(/[A-Z]{4,}/.test(text)){ score += 5; reasons.push("Utilise beaucoup de majuscules."); }
+  if(/!\s*!|!!+/.test(text)){ score += 5; reasons.push("Forte pression visuelle."); }
+  if(/[a-z]\.[a-z]{2,}\/(login|verify|secure|confirm|paiement)/i.test(text)){ score += 20; reasons.push("URL suspecte avec mots-clés de connexion"); }
+
+  score = Math.min(100, score);
+  const level = score >= 60 ? "Élevé" : score >= 30 ? "Moyen" : "Faible";
+  const cls = score >= 60 ? "danger" : score >= 30 ? "warning" : "success";
+  if(!reasons.length) reasons.push("Aucun signal évident détecté.");
+
+  result.innerHTML = `<div class="result ${cls}"><div class="risk-score">${score}/100</div><strong>Niveau de risque : ${level}</strong><br><br>
+    <strong>🔎 Signaux détectés :</strong><ul style="margin:8px 0 0 20px">${reasons.map(r => `<li>${escapeHtml(r)}</li>`).join("")}</ul><br>
+    <strong>⚠️ Important :</strong> cette analyse est une aide automatique et ne garantit rien.</div>`;
+}
+
+const CALL_FLAGS = ["Demande un code reçu par SMS ou un mot de passe","Demande un virement, un paiement ou des cartes cadeau","Demande d'installer une application ou de prendre le contrôle de l'appareil","Se dit banque, police ou support et presse à agir vite","Demande de ne parler à personne ou de rester en ligne","Numéro masqué ou étranger"];
+
+function buildCallList(){
+  $("callList").innerHTML = CALL_FLAGS.map((t,i) => `<div class="item"><label><input type="checkbox" class="callflag" onchange="callCheck()"><span>${escapeHtml(t)}</span></label></div>`).join("");
+}
+
+function callCheck(){
+  const n = document.querySelectorAll(".callflag:checked").length;
+  $("callResult").innerHTML = n ? `<div class="result danger"><strong>🚨 Probable arnaque (${n} signal/signaux)</strong><br><br>1. Raccrochez maintenant.<br>2. Ne donnez aucun code, ne faites aucun paiement.<br>3. Rappelez vous-même le numéro officiel.<br>4. Si vous avez payé : banque tout de suite, puis police (117).</div>` : "";
+}
+
+function rentRule(){
+  const income = +(appData.money || {}).income || 0;
+  const rent = parseFloat($("housingMaxRent").value) || 0;
+  const out = $("rentRuleResult");
+  if(!income){ out.innerHTML = `<div class="result warning">Renseignez d'abord vos revenus dans « Argent ».</div>`; return; }
+  const max = Math.round(income / 3);
+  const ok = !rent || rent <= max;
+  out.innerHTML = `<div class="result ${ok ? "success" : "warning"}">Règle courante : le loyer ne dépasse pas environ 1/3 du revenu.<br>Loyer conseillé max : <strong>${formatCHF(max)}</strong>${rent ? `<br>Votre plafond : <strong>${formatCHF(rent)}</strong> ${ok ? "✅" : "⚠️"}` : ""}<br><span class="small">Indication générale.</span></div>`;
+}
+
+function checkListing(){
+  const text = $("listingText").value.trim();
+  const out = $("listingResult");
+  if(!text){ out.innerHTML = `<div class="result warning">Collez une annonce.</div>`; return; }
+  const t = normalizeText(text);
+  const flags = [
+    [/western union|moneygram|bitcoin|crypto|carte cadeau/, "Paiement non traçable"],
+    [/avant (la |de )?visite|sans visite|visite impossible|ne peux pas (visiter|venir)/, "Paiement sans visite"],
+    [/a l'etranger|en mission|missionnaire|voyage|pas en suisse/, "Propriétaire absent"],
+    [/cles par (la )?poste|envoie.*cles|remise des cles par/, "Remise des clés par envoi"],
+    [/acompte|depot de garantie.*(virement|avance)|payer.*(avance|d'avance)/, "Argent demandé à l'avance"],
+    [/whatsapp|telegram/, "Contact uniquement par messagerie"],
+    [/urgent|derniere chance|plusieurs interesses/, "Pression pour décider vite"]
+  ].filter(([re]) => re.test(t)).map(f => f[1]);
+  const cls = flags.length >= 3 ? "danger" : flags.length ? "warning" : "success";
+  out.innerHTML = `<div class="result ${cls}"><strong>${flags.length >= 3 ? "🚨 Risque élevé" : flags.length ? "⚠️ À vérifier" : "✅ Aucun signal évident"}</strong>${flags.length ? "<ul style='margin:8px 0 0 20px'>" + flags.map(f => `<li>${escapeHtml(f)}</li>`).join("") + "</ul>" : ""}<br><span class="small">Visitez toujours et ne payez rien avant le bail.</span></div>`;
+}
+
+function clearListing(){ $("listingText").value = ""; $("listingResult").innerHTML = ""; }
+
+/* ---------- Vérifié : formule loyer conforme OFL (2,91% par quart, moins 40% inflation) ---------- */
+function rentCalc(){
+  const rent = parseFloat($("rRent").value), base = parseFloat($("rBase").value), infl = parseFloat($("rInfl").value) || 0;
+  if(!(rent > 0)) return null;
+  const steps = Math.round((base - 1.25) / 0.25);
+  const red = steps > 0 ? 1 - Math.pow(1 - 0.0291, steps) : 0;
+  const net = Math.max(0, red - 0.4 * infl / 100);
+  return {rent, base, infl, steps, net, newRent:rent * (1 - net), indexed:$("rIndexed").checked};
+}
+
+function calcRent(){
+  const c = rentCalc(), out = $("rentResult");
+  if(!c){ out.innerHTML = `<div class="result warning">Saisissez votre loyer net actuel.</div>`; return; }
+  appData.rent = {rent:c.rent, base:c.base, infl:c.infl, indexed:c.indexed};
+  saveData(); lastRent = c;
+  if(c.indexed){ out.innerHTML = `<div class="result warning">Un bail indexé ou échelonné ne donne pas droit à une baisse liée au taux de référence.</div>`; return; }
+  if(c.steps <= 0){ out.innerHTML = `<div class="result info">Votre loyer repose déjà sur le taux actuel ou moins.</div>`; return; }
+  const save = c.rent - c.newRent;
+  out.innerHTML = `<div class="result ${save > 0 ? "success" : "warning"}"><strong>⚖️ Estimation</strong><br><br>
+    Écart de taux : ${c.steps} quart(s) de point<br>
+    Baisse estimée : <strong>${(c.net * 100).toFixed(2)} %</strong><br>
+    Loyer net estimé : <strong>${formatCHF(c.newRent)}</strong>/mois<br>
+    Économie : <strong>${formatCHF(save)}</strong>/mois, soit <strong>${formatCHF(save * 12)}</strong>/an<br><br>
+    <span class="small">Méthode officielle OFL : environ 2,91 % par quart de point, moins 40 % de l'inflation répercutable. Le bailleur peut aussi invoquer ses frais d'entretien.</span></div>`;
+}
+
+function renderRent(){
+  const r = appData.rent; if(!r) return;
+  $("rRent").value = r.rent || ""; $("rBase").value = String(r.base || "1.5");
+  $("rInfl").value = r.infl || 0; $("rIndexed").checked = !!r.indexed;
+}
+
+function clearRent(){
+  appData.rent = null; saveData();
+  $("rRent").value = ""; $("rBase").value = "1.5"; $("rInfl").value = "0"; $("rIndexed").checked = false;
+  $("rentResult").innerHTML = ""; lastRent = null;
+}
+
+function rentLetter(){
+  const c = rentCalc(); if(!c){ showToast("Saisissez d'abord votre loyer"); return; }
+  const base = String(c.base).replace(".", ",");
+  openPanel("tools"); $("lType").value = "loyer";
+  $("lDetail").value = c.steps > 0 && !c.indexed
+    ? `Mon loyer actuel (CHF ${c.rent.toFixed(2)}) repose sur un taux de référence de ${base} %. Je vous demande de le réduire à CHF ${c.newRent.toFixed(2)} dès le prochain terme possible.`
+    : `Mon loyer actuel est de CHF ${c.rent.toFixed(2)}. Vérifiez s'il peut être réduit.`;
+  setTimeout(() => $("lType").scrollIntoView({behavior:"smooth", block:"center"}), 150);
+}
+
+function addRateReminder(){
+  const now = new Date(), y = now.getFullYear();
+  const cand = [[y,3],[y,6],[y,9],[y,12],[y+1,3]].map(([yy,m]) => yy + "-" + String(m).padStart(2,"0") + "-01").find(d => d > todayStr());
+  const text = "⚖️ Vérifier le nouveau taux de référence des loyers (publication début du mois)";
+  if(appData.documents.some(d => d.text === text)){ showToast("Rappel déjà ajouté"); return; }
+  appData.documents.push({text, done:false, due:cand});
+  saveData(); renderList("documents"); renderToday();
+  showToast("Rappel ajouté pour le " + fmtDate(cand));
+}
+
+const HEALTH_STEPS = ["Recevoir ma lettre de nouvelle prime (au plus tard fin octobre)","Comparer les primes sur priminfo.admin.ch","Comparer franchises et modèles d'assurance","Demander l'offre à la nouvelle caisse avant de résilier","Envoyer la résiliation (recommandé) avant la date limite"];
+
+function lastWorkingDayNov(y){
+  const d = new Date(y, 10, 30, 12);
+  while(d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() - 1);
+  return isoLocal(d);
+}
+
+function healthDeadline(){ const y = new Date().getFullYear(), a = lastWorkingDayNov(y); return a >= todayStr() ? a : lastWorkingDayNov(y + 1); }
+function healthDays(){ return Math.round((new Date(healthDeadline() + "T12:00:00") - new Date(todayStr() + "T12:00:00")) / 86400000); }
+
+function renderHealth(){
+  const dl = healthDeadline(), days = healthDays();
+  const h = appData.health || {};
+  const cls = days <= 14 ? "danger" : days <= 45 ? "warning" : "info";
+  $("healthCountdown").innerHTML = `<div class="result ${cls}" style="margin:0"><strong>⏳ Date limite de résiliation : ${fmtDate(dl)}</strong><br>
+    ${days === 0 ? "C'est aujourd'hui !" : "Il reste <strong>" + days + " jour(s)</strong>."} C'est le dernier jour ouvrable de novembre.<br>
+    <span class="small">Les assureurs doivent vous informer de votre nouvelle prime par écrit au plus tard fin octobre.</span></div>`;
+  if(h.prime) $("hPrime").value = h.prime;
+  if(h.pct !== undefined) $("hPct").value = h.pct;
+  const checks = h.checks || [];
+  $("healthSteps").innerHTML = `<div class="list">${HEALTH_STEPS.map((t,i) => `<div class="item"><label><input type="checkbox" ${checks[i] ? "checked" : ""} onchange="toggleHealthStep(${i})"><span class="${checks[i] ? "done" : ""}">${escapeHtml(t)}</span></label></div>`).join("")}</div>`;
+}
+
+function toggleHealthStep(i){
+  appData.health = appData.health || {};
+  appData.health.checks = appData.health.checks || [];
+  appData.health.checks[i] = !appData.health.checks[i];
+  saveData(); renderHealth();
+}
+
+function calcHealth(){
+  const prime = parseFloat($("hPrime").value), pct = parseFloat($("hPct").value);
+  const out = $("healthResult");
+  if(!Number.isFinite(prime) || prime <= 0 || !Number.isFinite(pct)){ out.innerHTML = `<div class="result warning">Saisissez votre prime actuelle et la hausse estimée.</div>`; return; }
+  const next = prime * (1 + pct / 100), diff = next - prime;
+  appData.health = Object.assign({}, appData.health, {prime, pct}); saveData();
+  out.innerHTML = `<div class="result ${diff > 0 ? "warning" : "success"}"><strong>Estimation 2027</strong><br><br>
+    Prime actuelle : <strong>${formatCHF(prime)}</strong>/mois<br>
+    Prime estimée : <strong>${formatCHF(next)}</strong>/mois<br>
+    Écart : <strong>${formatCHF(diff)}</strong>/mois, soit <strong>${formatCHF(diff * 12)}</strong>/an<br><br>
+    <span class="small">Estimation indicative. Comparez avec votre lettre d'assureur.</span></div>`;
+}
+
+function clearHealth(){
+  appData.health = {}; saveData();
+  $("hPrime").value = ""; $("hPct").value = "5"; $("hPreset").selectedIndex = 0;
+  $("healthResult").innerHTML = ""; renderHealth();
+}
+
+function goTool(id){ openPanel("tools"); setTimeout(() => { const el = $(id); if(el) el.scrollIntoView({behavior:"smooth", block:"center"}); }, 150); }
+function healthLetter(){ openPanel("tools"); $("lType").value = "lamal"; setTimeout(() => $("lType").scrollIntoView({behavior:"smooth", block:"center"}), 150); }
+
+function addHealthReminder(){
+  const dl = healthDeadline();
+  const text = "🏥 Envoyer la résiliation d'assurance maladie (dernier jour : " + fmtDate(dl) + ")";
+  if(appData.documents.some(d => d.text === text)){ showToast("Rappel déjà ajouté"); return; }
+  appData.documents.push({text, done:false, due:addDays(dl,-7)});
+  saveData(); renderList("documents"); renderToday();
+  showToast("Rappel ajouté : une semaine avant la date limite");
+}
+
+function renderToday(){
+  const box = $("todayBox"); if(!box) return;
+  const tag = (list, src) => (list || []).map(i => ({...i, src}));
+  const all = [...tag(appData.documents,"📄"), ...tag(appData.family,"👨‍👩‍👧‍👦"), ...tag(appData.applications,"🏠")].filter(i => !i.done && i.due).sort((a,b) => a.due.localeCompare(b.due));
+  const late = all.filter(i => i.due < todayStr()).length;
+  const m = appData.money || {};
+  const bal = m.income ? m.income - ["rent","insurance","food","transport","bills","subscriptions","other"].reduce((s,k) => s + (+m[k] || 0), 0) : null;
+  const hd = healthDays();
+  const hLine = hd <= 60 ? `<div class="row">🏥 Résiliation assurance maladie : ${hd} jour(s)</div>` : "";
+  if(!all.length && bal === null && !hLine){ box.innerHTML = ""; return; }
+  box.innerHTML = `<div class="result info" style="margin:0 0 14px"><strong>📅 Aujourd'hui</strong>
+    ${late ? `<div class="row">⚠️ ${late} échéance(s) en retard</div>` : ""}
+    ${hLine}
+    ${all.slice(0,3).map(i => `<div class="row">${i.src} ${escapeHtml(i.text)} : ${fmtDate(i.due)}</div>`).join("")}
+    ${bal !== null ? `<div class="row">💰 Solde mensuel : <strong>${formatCHF(bal)}</strong></div>` : ""}</div>`;
+}
+
+function ibanValid(v){
+  const s = v.replace(/\s/g,"").toUpperCase();
+  if(!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(s)) return false;
+  let rem = 0;
+  for(const ch of s.slice(4) + s.slice(0,4)){
+    const n = /\d/.test(ch) ? ch : String(ch.charCodeAt(0) - 55);
+    for(const d of n) rem = (rem * 10 + +d) % 97;
+  }
+  return rem === 1;
+}
+
+function validateNumber(){
+  const type = $("vType").value, raw = $("vInput").value.trim(), out = $("vResult");
+  const digits = raw.replace(/\D/g,"");
+  let ok = false, note = "";
+  if(type === "iban"){
+    ok = ibanValid(raw);
+    const c = raw.replace(/\s/g,"").toUpperCase().slice(0,2);
+    note = ok ? (["CH","LI"].includes(c) ? "IBAN suisse valide." : "IBAN valide, mais étranger (" + c + ").") : "Clé de contrôle incorrecte.";
+  }
+  if(type === "avs"){
+    ok = digits.length === 13 && digits.startsWith("756");
+    if(ok){ const sum = [...digits.slice(0,12)].reduce((a,d,i) => a + +d * (i % 2 ? 3 : 1), 0); ok = (10 - sum % 10) % 10 === +digits[12]; }
+    note = ok ? "Numéro AVS valide." : "Format 756.XXXX.XXXX.XX attendu.";
+  }
+  if(type === "uid"){
+    const d = digits;
+    if(d.length === 9){
+      const w = [5,4,3,2,7,6,5,4];
+      const sum = w.reduce((a,x,i) => a + x * +d[i], 0);
+      let c = 11 - sum % 11; if(c === 11) c = 0;
+      ok = c !== 10 && c === +d[8];
+    }
+    note = ok ? "Numéro IDE valide." : "Numéro IDE invalide.";
+  }
+  out.innerHTML = raw ? `<div class="result ${ok ? "success" : "danger"}">${ok ? "✅" : "❌"} ${escapeHtml(note)}</div>` : `<div class="result warning">Saisissez un numéro.</div>`;
+}
+
+function parseBill(t){
+  const L = t.split(/\r?\n/);
+  if(L[0] !== "SPC") return null;
+  return {iban:(L[3] || "").replace(/\s/g,""), name:L[5] || "", amount:L[18] || "", cur:L[19] || "", ref:L[28] || ""};
+}
+
+function handleBill(e){
+  const file = e.target.files[0]; const out = $("billResult");
+  if(!file) return;
+  out.innerHTML = `<div class="result info">🔎 Lecture du QR en cours...</div>`;
+  const rd = new FileReader();
+  rd.onload = async ev => {
+    const raw = await readQR(ev.target.result);
+    const b = raw ? parseBill(raw) : null;
+    if(!b){ out.innerHTML = `<div class="result danger">❌ Aucun QR-facture suisse lisible.</div>`; return; }
+    showBill(b);
+  };
+  rd.readAsDataURL(file);
+}
+
+function showBill(b){
+  const out = $("billResult");
+  lastBill = b;
+  const ch = /^(CH|LI)/.test(b.iban); const ok = ibanValid(b.iban);
+  out.innerHTML = `<div class="result ${ok && ch ? "success" : "warning"}"><strong>🧾 QR-facture lu</strong>
+    <div class="row">Bénéficiaire : <strong>${escapeHtml(b.name)}</strong></div>
+    <div class="row">IBAN : ${escapeHtml(b.iban)} ${ok ? "✅" : "❌"}</div>
+    <div class="row">Montant : <strong>${b.amount ? escapeHtml(b.amount + " " + b.cur) : "libre"}</strong></div>
+    ${ch ? "" : `<div class="row">⚠️ IBAN étranger.</div>`}
+    <div class="btn-row"><button type="button" class="btn primary" onclick="addBill()">➕ Ajouter à mes documents</button></div></div>`;
+}
+
+function stopBillCam(){
+  clearInterval(billTimer); billTimer = null;
+  if(billStream){ billStream.getTracks().forEach(t => t.stop()); billStream = null; }
+}
+
+async function addBill(){
+  if(!lastBill) return;
+  const res = await uiForm("Échéance de paiement", [{label:"Date (facultatif)", type:"date"}]);
+  if(!res) return;
+  const due = res[0];
+  appData.documents.push({text:"Facture " + lastBill.name + (lastBill.amount ? " " + lastBill.amount + " " + lastBill.cur : ""), done:false, due});
+  saveData(); renderList("documents"); renderToday();
+  showToast("Facture ajoutée aux documents");
+}
+
+function clearBill(){ lastBill = null; $("billResult").innerHTML = ""; $("billFile").value = ""; $("billFile2").value = ""; }
+
+const LETTERS = {
+  bail:(f) => `Objet : Résiliation de bail\n\nMadame, Monsieur,\n\nPar la présente, je résilie mon bail concernant le logement situé ${f.addr}, pour le prochain terme contractuel et dans le respect du délai de congé. ${f.detail}\n\nMerci de me confirmer la réception de ce courrier et de convenir d'une date pour l'état des lieux de sortie.`,
+  assurance:(f) => `Objet : Résiliation de mon contrat d'assurance\n\nMadame, Monsieur,\n\nPar la présente, je résilie mon contrat d'assurance pour la prochaine échéance possible. ${f.detail}\n\nMerci de me confirmer par écrit la fin du contrat.`,
+  amende:(f) => `Objet : Contestation d'amende\n\nMadame, Monsieur,\n\nJe conteste l'amende qui m'a été notifiée. ${f.detail}\n\nJe vous prie de bien vouloir réexaminer ma situation et de suspendre la procédure dans l'attente de votre réponse.`,
+  lamal:(f) => `Objet : Résiliation de l'assurance obligatoire des soins\n\nMadame, Monsieur,\n\nPar la présente, je résilie mon assurance obligatoire des soins (assurance de base) pour le 31 décembre ${new Date(healthDeadline() + "T12:00:00").getFullYear()}. ${f.detail}\n\nMerci de me confirmer par écrit la bonne réception de ce courrier et la fin du contrat.`,
+  loyer:(f) => `Objet : Demande de baisse de loyer\n\nMadame, Monsieur,\n\nLe taux d'intérêt de référence applicable aux loyers est actuellement de 1,25 %. ${f.detail}\n\nJe vous prie de bien vouloir me répondre par écrit dans un délai de 30 jours.`,
+  delai:(f) => `Objet : Demande de délai de paiement\n\nMadame, Monsieur,\n\nJe rencontre actuellement une difficulté temporaire et vous demande un délai de paiement pour la facture concernée. ${f.detail}\n\nJe vous propose de convenir d'un arrangement et vous remercie de votre compréhension.`
+};
+
+function makeLetter(){
+  const f = {name:$("lName").value.trim(), addr:$("lAddr").value.trim(), to:$("lTo").value.trim(), detail:$("lDetail").value.trim()};
+  const body = LETTERS[$("lType").value](f);
+  const reco = ["bail","assurance","lamal","loyer"].includes($("lType").value) ? "À envoyer en courrier recommandé." : "";
+  const parts = [];
+  if(f.name) parts.push(f.name);
+  if(f.addr) parts.push(f.addr);
+  if(f.name || f.addr) parts.push("");
+  if(f.to) parts.push(f.to, "");
+  parts.push(fmtDateLong(todayStr()) + ", le " + fmtDate(todayStr()));
+  parts.push(""); parts.push(body); parts.push("");
+  parts.push("Veuillez agréer, Madame, Monsieur, mes salutations distinguées.");
+  parts.push(""); parts.push(f.name || "________________________");
+  if(reco){ parts.push(""); parts.push("📮 " + reco); }
+  const text = parts.join("\n");
+  $("lOut").textContent = text;
+  $("lOut").dataset.raw = text;
+  showToast("Lettre générée");
+}
+
+function copyLetter(){ const text = $("lOut").dataset.raw || ""; if(!text){ showToast("Générez d'abord la lettre"); return; } copyText(text); }
+function printLetter(){ const text = $("lOut").dataset.raw || ""; if(!text){ showToast("Générez d'abord la lettre"); return; } window.print(); }
+function clearLetter(){ ["lName","lAddr","lTo","lDetail"].forEach(id => { $(id).value = ""; }); $("lOut").textContent = ""; $("lOut").dataset.raw = ""; }
+
+/* ---------- Vérifié : formule LAMal correcte (10% quote-part max 700 CHF/an) ---------- */
+function franchiseCost(prime, f, costs){ const share = costs <= f ? costs : f + Math.min(0.1 * (costs - f), 700); return prime * 12 + share; }
+
+function compareFranchise(){
+  const fa = +$("fA").value, fb = +$("fB").value;
+  const pa = parseFloat($("pA").value), pb = parseFloat($("pB").value), c = parseFloat($("fCosts").value);
+  const out = $("fResult");
+  if(![pa,pb,c].every(Number.isFinite)){ out.innerHTML = `<div class="result warning">Remplissez les deux primes et vos frais prévus.</div>`; return; }
+  const ca = franchiseCost(pa,fa,c), cb = franchiseCost(pb,fb,c);
+  const best = ca <= cb ? "A" : "B";
+  out.innerHTML = `<div class="result success"><strong>🏥 Coût annuel estimé</strong><br><br>
+    Franchise ${fa} : <strong>${formatCHF(ca)}</strong><br>
+    Franchise ${fb} : <strong>${formatCHF(cb)}</strong><br><br>
+    ✅ Le choix ${best} est le moins cher (écart ${formatCHF(Math.abs(ca - cb))}).<br>
+    <span class="small">Primes + franchise + quote-part 10 % (max 700 CHF/an).</span></div>`;
+}
+
+function clearFranchise(){ ["pA","pB","fCosts"].forEach(id => { $(id).value = ""; }); $("fA").value = "300"; $("fB").value = "2500"; $("fResult").innerHTML = ""; }
+
+/* ---------- Vérifié : brut→net avec taux officiels AVS/AC ---------- */
+function calcNet(){
+  const g = parseFloat($("gross").value);
+  const lpp = parseFloat($("lppPct").value) || 0, aanp = parseFloat($("aanpPct").value) || 0;
+  const out = $("netResult");
+  if(!Number.isFinite(g) || g <= 0){ out.innerHTML = `<div class="result warning">Saisissez un salaire brut.</div>`; return; }
+  const rows = [["AVS / AI / APG (5,3 %)",5.3],["Assurance chômage (1,1 %)",1.1],["LPP (" + lpp + " %)",lpp],["Accident non prof. (" + aanp + " %)",aanp]];
+  const total = rows.reduce((a,x) => a + g * x[1] / 100, 0);
+  out.innerHTML = `<div class="result info"><strong>Net estimé : ${formatCHF(g - total)}</strong> par mois<br><br>
+    ${rows.map(x => `<div class="row">− ${formatCHF(g * x[1] / 100)} : ${escapeHtml(x[0])}</div>`).join("")}<br>
+    <span class="small">Estimation avant impôt. Voir votre fiche de salaire.</span></div>`;
+}
+
+function clearNet(){ $("gross").value = ""; $("lppPct").value = "5"; $("aanpPct").value = "1"; $("netResult").innerHTML = ""; }
+
+const LIFE = {
+  move:["🚚 Déménagement",[["Informer La Poste du changement d'adresse",-7],["Informer l'assurance maladie et l'employeur",-7],["Mettre à jour assurance ménage et RC",-14],["État des lieux de sortie",0],["Annoncer l'arrivée à la commune (dans les 14 jours)",14],["Récupérer la caution",30]]],
+  birth:["👶 Naissance",[["Informer l'employeur (congé, horaires)",-60],["Annoncer la naissance à l'état civil",3],["Affilier l'enfant à une assurance maladie",30],["Demander les allocations familiales",30],["Mettre à jour assurances et testament",90]]],
+  job:["💼 Nouveau travail",[["Signer le contrat de travail",-14],["Transmettre données bancaires et AVS à l'employeur",-7],["Transférer l'avoir de prévoyance (LPP)",30],["Vérifier assurance accident",7]]],
+  unemp:["📉 Perte d'emploi",[["S'inscrire à l'ORP",0],["Demander les indemnités à la caisse de chômage",7],["Rassembler contrat, certificats de salaire et lettre de congé",3],["Adapter le budget mensuel",7],["Vérifier assurance maladie et subsides",14]]]
+};
+
+function lifeSteps(){
+  const key = $("lifeType").value;
+  const base = $("lifeDate").value || todayStr();
+  return LIFE[key][1].map(([t,o]) => ({text:LIFE[key][0].replace(/^\S+\s/,"") + " : " + t, due:addDays(base,o)}));
+}
+
+function previewLife(){
+  $("lifeResult").innerHTML = `<div class="result info"><strong>${LIFE[$("lifeType").value][0]}</strong>${lifeSteps().map(i => `<div class="row">📅 ${fmtDate(i.due)} : ${escapeHtml(i.text.split(" : ")[1])}</div>`).join("")}</div>`;
+}
+
+/* ---------- CORRIGÉ : retour clair si rien à ajouter ---------- */
+function applyLife(){
+  const have = appData.documents.map(d => d.text);
+  const all = lifeSteps();
+  const add = all.filter(i => !have.includes(i.text));
+  if(add.length === 0){
+    $("lifeResult").innerHTML = `<div class="result warning">⚠️ Ces ${all.length} étapes sont <strong>déjà dans vos documents</strong>.<br>Utilisez « Retirer » d'abord si vous voulez les re-ajouter.</div>`;
+    showToast("Étapes déjà présentes");
+    return;
+  }
+  add.forEach(i => appData.documents.push({text:i.text, done:false, due:i.due}));
+  saveData(); renderList("documents"); renderToday();
+  $("lifeResult").innerHTML = `<div class="result success">✅ ${add.length} étape(s) ajoutée(s) dans « Documents ».<br><span class="small">Ouvrez le module Documents pour les voir.</span></div>`;
+  showToast(add.length + " étape(s) ajoutée(s)");
+}
+
+async function removeLife(){
+  const texts = lifeSteps().map(i => i.text);
+  const n = appData.documents.filter(d => texts.includes(d.text)).length;
+  if(!n){ showToast("Aucune de ces étapes dans vos documents"); return; }
+  if(!await uiConfirm("Retirer " + n + " étape(s) ?", "Retirer")) return;
+  appData.documents = appData.documents.filter(d => !texts.includes(d.text));
+  saveData(); renderList("documents"); renderToday();
+  $("lifeResult").innerHTML = `<div class="result success">↩️ ${n} étape(s) retirée(s).</div>`;
+}
+
+function clearLife(){ $("lifeType").selectedIndex = 0; $("lifeDate").value = ""; $("lifeResult").innerHTML = ""; }
+
+const SWISS_DATES = [["🏥 Assurance maladie : résiliation au plus tard le dernier jour ouvrable de novembre",11,30],["💼 3e pilier A : dernier versement de l'année",12,31],["🧾 Déclaration d'impôts (souvent, selon le canton)",3,31]];
+
+function nextDate(m, d){
+  const t = todayStr(), y = new Date().getFullYear();
+  const f = yr => yr + "-" + String(m).padStart(2,"0") + "-" + String(d).padStart(2,"0");
+  return f(y) >= t ? f(y) : f(y+1);
+}
+
+function renderCalendar(){
+  const ov = appData.swissOv || {};
+  const tag = (l,src,key) => (l || []).map((i,idx) => ({text:i.text, due:i.due, done:i.done, src, ref:{list:key, idx}}));
+  calItems = [...tag(appData.documents,"📄","documents"), ...tag(appData.family,"👨‍👩‍👧‍👦","family"), ...tag(appData.applications,"🏠","applications")].filter(i => i.due && !i.done);
+  SWISS_DATES.forEach(([t,m,d],n) => {
+    if(ov[n] && ov[n].hidden) return;
+    calItems.push({text:t, due:(ov[n] && ov[n].due) || (n === 0 ? healthDeadline() : nextDate(m,d)), src:"🇨🇭", ref:{swiss:n}});
+  });
+  calItems.sort((a,b) => a.due.localeCompare(b.due));
+  $("calList").innerHTML = calItems.length ? `<div class="list">${calItems.map((i,n) => {
+    const late = i.due < todayStr();
+    return `<div class="item"><span>${i.src} ${escapeHtml(i.text)}<span class="badge ${late ? "late" : ""}">${late ? "⚠️ En retard : " : "📅 "}${fmtDate(i.due)}</span></span>
+      <span style="display:flex;gap:6px;flex-shrink:0">
+        <button type="button" class="rm" style="background:#eef6ff;color:#15538a" onclick="gcal(${n})" aria-label="Google">📅</button>
+        <button type="button" class="rm" style="background:#f0f1f3;color:#333" onclick="editCal(${n})" aria-label="Modifier">✏️</button>
+        <button type="button" class="rm" onclick="delCal(${n})" aria-label="Supprimer">🗑️</button>
+      </span></div>`;
+  }).join("")}</div>` : `<div class="empty">Aucune échéance.</div>`;
+}
+
+async function editCal(n){
+  const i = calItems[n]; if(!i) return;
+  const fields = i.ref.list ? [{label:"Nom", value:i.text}] : [{text:i.text}];
+  fields.push({label:"Date", type:"date", value:i.due});
+  const res = await uiForm("Modifier l'échéance", fields);
+  if(!res) return;
+  const due = res[res.length - 1]; const text = i.ref.list ? res[0] : i.text;
+  if(!due || !text){ showToast("Nom et date requis"); return; }
+  if(i.ref.list){
+    const it = appData[i.ref.list][i.ref.idx]; if(!it) return;
+    it.text = text; it.due = due;
+    renderList(i.ref.list);
+  }else{
+    appData.swissOv = appData.swissOv || {};
+    appData.swissOv[i.ref.swiss] = Object.assign({}, appData.swissOv[i.ref.swiss], {due, hidden:false});
+  }
+  saveData(); renderCalendar(); renderToday();
+}
+
+async function delCal(n){
+  const i = calItems[n];
+  if(!i || !await uiConfirm("Supprimer « " + i.text + " » ?", "Supprimer")) return;
+  if(i.ref.list){ appData[i.ref.list].splice(i.ref.idx,1); renderList(i.ref.list); }
+  else { appData.swissOv = appData.swissOv || {}; appData.swissOv[i.ref.swiss] = {hidden:true}; }
+  saveData(); renderCalendar(); renderToday();
+}
+
+function resetSwiss(){ delete appData.swissOv; saveData(); renderCalendar(); showToast("Dates par défaut restaurées"); }
+
+function gcal(n){
+  const i = calItems[n]; if(!i) return;
+  const d = i.due.replace(/-/g,"");
+  openExternal("https://calendar.google.com/calendar/render?action=TEMPLATE&text=" + encodeURIComponent(i.text) + "&dates=" + d + "/" + addDays(i.due,1).replace(/-/g,""));
+}
+
+async function exportICS(){
+  if(!calItems.length){ showToast("Aucune échéance à exporter"); return; }
+  const clean = t => String(t).replace(/[,;\\]/g," ").replace(/\n/g," ");
+  const stamp = new Date().toISOString().replace(/[-:]/g,"").slice(0,15) + "Z";
+  const ev = calItems.map((i,n) => ["BEGIN:VEVENT","UID:helvetia-" + n + "-" + i.due + "@helvetia-tools","DTSTAMP:" + stamp,"DTSTART;VALUE=DATE:" + i.due.replace(/-/g,""),"DTEND;VALUE=DATE:" + addDays(i.due,1).replace(/-/g,""),"SUMMARY:" + clean(i.text),"BEGIN:VALARM","TRIGGER:-P1D","ACTION:DISPLAY","DESCRIPTION:" + clean(i.text),"END:VALARM","END:VEVENT"].join("\r\n"));
+  const ics = ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Helvetia-Tools//FR",...ev,"END:VCALENDAR"].join("\r\n");
+  const file = new File([ics], "echeances.ics", {type:"text/calendar"});
+  try{ if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:"Échéances"}); return; } }catch(e){ if(e.name === "AbortError") return; }
+  try{
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(file);
+    a.download = "echeances.ics";
+    document.body.appendChild(a); a.click(); a.remove();
+    showToast("Fichier généré.");
+  }catch(e){ showToast("Export impossible ici"); }
+}
+
+async function clearCalendar(){
+  if(!calItems.length){ showToast("Aucune échéance à effacer"); return; }
+  if(!await uiConfirm("Supprimer toutes les échéances ?", "Tout effacer")) return;
+  ["documents","family","applications"].forEach(k => { appData[k] = (appData[k] || []).filter(i => !(i.due && !i.done)); });
+  appData.swissOv = {};
+  SWISS_DATES.forEach((x,n) => { appData.swissOv[n] = {hidden:true}; });
+  saveData(); renderCalendar(); renderAll();
+  showToast("Échéances effacées");
+}
+
+const OFFICIAL = ["post.ch","swisscom.ch","postfinance.ch","sbb.ch","twint.ch","admin.ch","ch.ch","ubs.com","raiffeisen.ch","zkb.ch","migros.ch","coop.ch","sunrise.ch","salt.ch","localsearch.ch","local.ch","search.ch","ncsc.admin.ch","antiphishing.ch"];
+const SHORTENERS = ["bit.ly","tinyurl.com","t.co","goo.gl","is.gd","cutt.ly","rb.gy","ow.ly","shorturl.at"];
+const BAD_TLD = ["xyz","top","click","icu","live","buzz","cyou","cfd","sbs","rest"];
+
+function lev(a,b){
+  const d = Array.from({length:a.length + 1}, (_,i) => [i, ...Array(b.length).fill(0)]);
+  for(let j = 1; j <= b.length; j++) d[0][j] = j;
+  for(let i = 1; i <= a.length; i++) for(let j = 1; j <= b.length; j++)
+    d[i][j] = Math.min(d[i-1][j] + 1, d[i][j-1] + 1, d[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+
+function checkLink(url){
+  let u;
+  try{ u = new URL(url); }catch(e){ return null; }
+  const host = u.hostname.toLowerCase(), reg = host.split(".").slice(-2).join(".");
+  const severe = [], flags = [];
+  const official = OFFICIAL.includes(reg);
+  if(/^\d+\.\d+\.\d+\.\d+$/.test(host)) severe.push("Adresse numérique (IP)");
+  if(host.includes("xn--")) severe.push("Nom de domaine déguisé");
+  if(/@/.test(url)) severe.push("Le lien contient un @ trompeur");
+  if(!official){
+    const label = reg.split(".")[0];
+    OFFICIAL.forEach(off => {
+      const name = off.split(".")[0];
+      if(name.length < 4) return;
+      if(label !== name && lev(label, name) <= 2) severe.push("Ressemble à " + off + " (copie)");
+      else if(label !== name && host.includes(name)) severe.push("Contient « " + name + " » mais appartient à " + reg);
+    });
+  }
+  if(SHORTENERS.includes(reg)) flags.push("Lien raccourci");
+  if(u.protocol === "http:") flags.push("Connexion non sécurisée (http)");
+  if(host.split(".").length > 4) flags.push("Beaucoup de sous-domaines");
+  if(BAD_TLD.includes(host.split(".").pop())) flags.push("Extension souvent utilisée par des arnaques");
+  if(/login|verify|secure|update|paiement|payment|colis|amende|tracking|remboursement|confirm/i.test(u.pathname + u.search)) flags.push("Mots typiques d'un faux site");
+  return {host, reg, official, severe:[...new Set(severe)], flags, url:u.href};
+}
+
+function analyzeQrContent(raw){
+  const out = $("qrResult");
+  let text = String(raw || "").trim();
+  if(!text){ out.innerHTML = `<div class="result warning">Scannez un QR ou collez un lien.</div>`; return; }
+  if(text.startsWith("SPC")){ out.innerHTML = `<div class="result info">🧾 C'est un QR-facture suisse. Utilisez Outils → Lire un QR-facture.</div>`; return; }
+  if(/^www\./i.test(text)) text = "https://" + text;
+  const r = /^https?:\/\//i.test(text) ? checkLink(text) : null;
+  if(!r){
+    out.innerHTML = `<div class="result info"><strong>Contenu du QR :</strong><br>${escapeHtml(text)}<div class="btn-row"><button type="button" class="btn primary" onclick="$('scamText').value=${escapeAttr(JSON.stringify(text))};analyzeScamText()">🛡️ Analyser comme texte</button></div></div>`;
+    return;
+  }
+  lastQr = r;
+  const bad = r.severe.length > 0, warn = r.flags.length > 0;
+  const cls = bad ? "danger" : warn ? "warning" : r.official ? "success" : "info";
+  const title = bad ? "🚨 Probablement frauduleux : n'ouvrez pas" : warn ? "⚠️ À vérifier avant d'ouvrir" : r.official ? "✅ Domaine officiel" : "ℹ️ Domaine inconnu";
+  out.innerHTML = `<div class="result ${cls}"><strong>${title}</strong><br><br>
+    Adresse réelle : <strong>${escapeHtml(r.host)}</strong><br>
+    <span class="small">${escapeHtml(r.url)}</span>
+    ${[...r.severe, ...r.flags].length ? "<ul style='margin:8px 0 0 20px'>" + [...r.severe, ...r.flags].map(f => `<li>${escapeHtml(f)}</li>`).join("") + "</ul>" : ""}
+    <br><span class="small">Un domaine inconnu n'est pas forcément sûr.</span>
+    <div class="btn-row">
+      <button type="button" class="btn ${bad ? "" : "primary"}" onclick="openQr()">🔗 Ouvrir quand même</button>
+      <button type="button" class="btn" onclick="copyText(lastQr.url)">📋 Copier</button>
+      <button type="button" class="btn danger" onclick="reportQr()">🚩 Signaler</button>
+    </div></div>`;
+}
+
+async function openQr(){
+  if(!lastQr) return;
+  const risky = lastQr.severe.length || lastQr.flags.length || !lastQr.official;
+  if(risky && !await uiConfirm("Ce lien n'est pas reconnu comme sûr (" + lastQr.host + "). Ouvrir quand même ?", "Ouvrir")) return;
+  openExternal(lastQr.url);
+}
+
+function reportQr(){
+  if(!lastQr) return;
+  copyQuiet("Lien suspect reçu via QR code : " + lastQr.url);
+  openExternal("https://report.ncsc.admin.ch");
+  showToast("Résumé copié.");
+}
+
+function handleQrShield(e){
+  const f = e.target.files[0], out = $("qrResult");
+  if(!f) return;
+  out.innerHTML = `<div class="result info">🔎 Lecture du QR...</div>`;
+  const rd = new FileReader();
+  rd.onload = async ev => {
+    const raw = await readQR(ev.target.result);
+    if(!raw){ out.innerHTML = `<div class="result danger">❌ Aucun QR lisible.</div>`; return; }
+    analyzeQrContent(raw);
+  };
+  rd.readAsDataURL(f);
+  e.target.value = "";
+}
+
+function clearQr(){ lastQr = null; $("qrUrl").value = ""; $("qrResult").innerHTML = ""; }
+function clearValidator(){ $("vInput").value = ""; $("vResult").innerHTML = ""; }
+
+function restoreApp(){
+  appData = loadData(); ensureData(); renderAll();
+  $("settingsResult").innerHTML = `<div class="result success">↩️ Les données enregistrées ont été rechargées.</div>`;
+  showToast("Données restaurées");
+}
+
+function exportData(){ copyText(JSON.stringify(appData,null,2)); }
+
+async function clearAllData(){
+  if(!await uiConfirm("ATTENTION : cette action effacera favoris, budget, logement, famille, documents et numéros enregistrés sur cet appareil. Continuer ?", "Tout effacer")) return;
+  localStorage.removeItem(STORAGE_KEY);
+  OLD_KEYS.forEach(k => localStorage.removeItem(k));
+  appData = cloneDefault(); saveData(); renderAll();
+  $("settingsResult").innerHTML = `<div class="result success">🗑️ Toutes les données locales ont été effacées.</div>`;
+  showToast("Données effacées");
+}
+
+let modalPrevFocus = null;
+
+function uiForm(title, fields, ok = "OK"){
+  return new Promise(resolve => {
+    modalPrevFocus = document.activeElement;
+    $("modalTitle").textContent = title;
+    $("modalBody").innerHTML = fields.map((f,i) => f.text
+      ? `<p style="margin-bottom:10px">${escapeHtml(f.text)}</p>`
+      : `<div class="field" style="margin-bottom:10px"><label for="mf${i}">${escapeHtml(f.label)}</label><input id="mf${i}" type="${f.type || "text"}" value="${escapeAttr(f.value || "")}"></div>`).join("");
+    $("modalOk").textContent = ok;
+    const close = v => {
+      $("modal").classList.add("hidden");
+      document.removeEventListener("keydown", onKey);
+      if(modalPrevFocus && modalPrevFocus.focus) modalPrevFocus.focus();
+      resolve(v);
+    };
+    const onKey = e => {
+      if(e.key === "Escape"){ e.preventDefault(); close(null); }
+      if(e.key === "Tab"){
+        const focusables = $("modal").querySelectorAll("button, input, select, textarea, [tabindex]:not([tabindex='-1'])");
+        if(!focusables.length) return;
+        const first = focusables[0], last = focusables[focusables.length - 1];
+        if(e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
+        else if(!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
+      }
+    };
+    $("modalOk").onclick = () => close(fields.map((f,i) => f.text ? null : $("mf" + i).value.trim()));
+    $("modalCancel").onclick = () => close(null);
+    document.addEventListener("keydown", onKey);
+    $("modal").classList.remove("hidden");
+    const idx = fields.findIndex(f => !f.text);
+    if(idx >= 0) setTimeout(() => { const el = $("mf" + idx); if(el) el.focus(); }, 60);
+  });
+}
+
+function uiConfirm(msg, ok = "Confirmer"){ return uiForm("Confirmation", [{text:msg}], ok).then(v => v !== null); }
+
+function renderAll(){
+  refreshFavorites(); renderMoney(); renderHousing();
+  renderList("family"); renderList("documents"); renderList("applications");
+  renderNumbers(); renderHealth(); renderRent(); renderToday();
+}
+
+window.addEventListener("beforeunload", () => {
+  if(cameraStream) cameraStream.getTracks().forEach(t => t.stop());
+  if(billStream) billStream.getTracks().forEach(t => t.stop());
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  buildUI();
+  buildCallList();
+  $("lifeType").innerHTML = Object.entries(LIFE).map(([k,v]) => `<option value="${k}">${v[0]}</option>`).join("");
+  ensureData();
+  renderAll();
+  updateBottomNav("home");
+});
+</script>
+</body>
+</html>
+
+    
+    
