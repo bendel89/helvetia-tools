@@ -661,7 +661,6 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
     </div>
   </div>
 </div>
-
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
@@ -825,7 +824,7 @@ function showToast(msg){
 }
 
 /* ============================================================
-   ONESIGNAL — Notifications Push
+   ONESIGNAL — Notifications Push (✅ CORRIGÉ)
    ============================================================ */
 
 function pushStatus(state, text){
@@ -851,11 +850,16 @@ function initOneSignal(){
   // Pousser la fonction d'init : elle sera exécutée dès que le SDK sera prêt
   window.OneSignalDeferred.push(async function(OneSignal){
     try{
+      // ✅ CORRECTION ICI : calcul automatique du chemin de base
+      const basePath = window.location.pathname.replace(/\/[^\/]*$/, "/");
+
       await OneSignal.init({
         appId: ONESIGNAL_APP_ID,
         allowLocalhostAsSecureOrigin: true,
-        serviceWorkerParam: { scope: "/helvetia-tools/" },
-        serviceWorkerPath: "/helvetia-tools/OneSignalSDKWorker.js",
+        // ✅ CORRECTION ICI : chemins dynamiques (au lieu de "/helvetia-tools/")
+        serviceWorkerParam: { scope: basePath },
+        serviceWorkerPath: basePath + "OneSignalSDKWorker.js",
+        // ⬆️ FIN DE LA CORRECTION
         notifyButton: { enable: false },
         welcomeNotification: {
           title: "Helvetia-Tools",
@@ -863,7 +867,7 @@ function initOneSignal(){
         }
       });
       oneSignalReady = true;
-      console.log("OneSignal initialisé");
+      console.log("OneSignal initialisé (basePath:", basePath, ")");
       updatePushUI();
       attachOneSignalListeners();
     }catch(e){
@@ -2668,4 +2672,3 @@ document.addEventListener("DOMContentLoaded", () => {
 </script>
 </body>
 </html>
-
