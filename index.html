@@ -791,13 +791,11 @@ function startDictation(targetId, btn){
   try{ rec.start(); }catch(e){ showToast("Impossible de démarrer"); activeRecognition = null; }
 }
 
-/* ============ PDF lettre (fonctionne, emojis retirés) ============ */
+/* ============ PDF lettre ============ */
 function downloadLetterPDF(){
   let text = $("lOut").dataset.raw || "";
   if(!text){ showToast("Générez d'abord la lettre"); return; }
   if(!window.jspdf || !window.jspdf.jsPDF){ showToast("Librairie PDF non chargée"); return; }
-  // Filtrer les caractères non supportés (emojis, symboles)
-  // Garde : ASCII, latin-1, latin étendu, guillemets courbes, tirets, points de suspension, sauts de ligne
   text = text.replace(/[^\x20-\x7E\u00A0-\u017F\u2018\u2019\u201C\u201D\u2013\u2014\u2026\n\r]/g, "");
   try{
     const { jsPDF } = window.jspdf;
@@ -838,7 +836,7 @@ function downloadData(){
   }catch(e){ showToast("Téléchargement impossible"); }
 }
 
-/* ============ Calcul impôts (barèmes réajustés 2024 — plus réalistes) ============ */
+/* ============ CORRIGÉ : Calcul impôts (barèmes réajustés — plus réalistes) ============ */
 function calcTaxes(){
   const canton = $("taxCanton").value;
   const situation = $("taxMarital").value;
@@ -848,23 +846,22 @@ function calcTaxes(){
   if(income <= 0){ out.innerHTML = `<div class="result warning">Saisissez un revenu annuel.</div>`; return; }
   const base = Math.max(0, income - ded);
 
-  // Barèmes progressifs réajustés (impôt total cantonal + communal + IFD)
-  // Référence : célibataire sans enfant, sans fortune
+  /* Barèmes progressifs réajustés pour approcher la réalité 2024.
+     Impôt total = cantonal + communal + IFD, célibataire sans enfant, sans fortune. */
   const bracketsSingle = {
-    VD:[[0,.00],[15000,.08],[30000,.15],[50000,.19],[70000,.23],[90000,.26],[120000,.28],[160000,.30],[250000,.32]],
-    GE:[[0,.00],[18000,.09],[35000,.16],[55000,.20],[75000,.24],[95000,.27],[125000,.29],[165000,.31],[250000,.33]],
-    VS:[[0,.00],[14000,.07],[28000,.13],[45000,.17],[65000,.21],[85000,.24],[110000,.26],[150000,.28],[250000,.30]],
-    FR:[[0,.00],[14000,.07],[28000,.13],[45000,.17],[65000,.21],[85000,.24],[110000,.26],[150000,.28],[250000,.30]],
-    NE:[[0,.00],[15000,.08],[30000,.15],[50000,.19],[70000,.23],[90000,.26],[120000,.28],[160000,.30],[250000,.32]],
-    JU:[[0,.00],[14000,.07],[28000,.13],[45000,.17],[65000,.21],[85000,.24],[110000,.26],[150000,.28],[250000,.30]],
-    BE:[[0,.00],[14000,.07],[28000,.13],[45000,.17],[65000,.21],[85000,.24],[110000,.26],[150000,.28],[250000,.30]],
-    ZH:[[0,.00],[12000,.06],[25000,.12],[42000,.16],[60000,.19],[80000,.22],[105000,.24],[145000,.26],[250000,.29]],
-    TI:[[0,.00],[15000,.08],[30000,.14],[48000,.18],[68000,.22],[88000,.25],[115000,.27],[155000,.29],[250000,.31]]
+    VD:[[0,.00],[12000,.08],[25000,.15],[40000,.20],[60000,.24],[90000,.28],[130000,.31],[200000,.33],[400000,.35]],
+    GE:[[0,.00],[12000,.09],[25000,.17],[40000,.22],[60000,.26],[90000,.30],[130000,.33],[200000,.35],[400000,.37]],
+    VS:[[0,.00],[12000,.06],[25000,.12],[40000,.16],[60000,.20],[90000,.24],[130000,.27],[200000,.29],[400000,.31]],
+    FR:[[0,.00],[12000,.06],[25000,.12],[40000,.16],[60000,.20],[90000,.24],[130000,.27],[200000,.29],[400000,.31]],
+    NE:[[0,.00],[12000,.09],[25000,.16],[40000,.21],[60000,.25],[90000,.28],[130000,.31],[200000,.33],[400000,.35]],
+    JU:[[0,.00],[12000,.07],[25000,.14],[40000,.18],[60000,.22],[90000,.26],[130000,.29],[200000,.31],[400000,.33]],
+    BE:[[0,.00],[12000,.07],[25000,.14],[40000,.18],[60000,.22],[90000,.26],[130000,.29],[200000,.31],[400000,.33]],
+    ZH:[[0,.00],[10000,.05],[22000,.10],[40000,.14],[60000,.18],[90000,.21],[130000,.24],[200000,.27],[400000,.30]],
+    TI:[[0,.00],[12000,.08],[25000,.15],[40000,.19],[60000,.23],[90000,.26],[130000,.29],[200000,.31],[400000,.33]]
   };
   const table = bracketsSingle[canton] || bracketsSingle.VD;
   const mult = situation === "married" ? 2 : 1;
 
-  // Calcul progressif par tranche
   let tax = 0;
   for(let i = 0; i < table.length; i++){
     const [threshold, rate] = table[i];
@@ -875,7 +872,6 @@ function calcTaxes(){
       tax += slice * rate;
     }
   }
-  // Abattement mariés (~10%)
   if(situation === "married") tax *= 0.90;
 
   const eff = income > 0 ? (tax / income * 100).toFixed(1) : 0;
@@ -883,7 +879,7 @@ function calcTaxes(){
     Revenu imposable : <strong>${formatCHF(base)}</strong><br>
     Impôt annuel estimé : <strong>${formatCHF(tax)}</strong><br>
     Taux effectif : <strong>${eff} %</strong><br><br>
-    <span class="small">⚠️ Estimation indicative basée sur barèmes 2024 (personne sans fortune). Votre vrai impôt dépend de votre fortune, enfants, frais de transport, cotisations LPP/3e pilier, etc. Consultez l'administration fiscale de votre canton.</span></div>`;
+    <span class="small">⚠️ Estimation indicative basée sur barèmes 2024 (personne sans fortune, sans enfants). Votre vrai impôt dépend de votre fortune, enfants, frais de transport, cotisations LPP/3e pilier, etc. Consultez l'administration fiscale de votre canton.</span></div>`;
 }
 function clearTaxes(){
   ["taxIncome","taxDeductions"].forEach(id => { const el = $(id); if(el) el.value = ""; });
@@ -943,7 +939,6 @@ function ensureData(){
 
 function saveData(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(appData)); }catch(e){ console.error(e); } }
 
-/* ============ Construction interface ============ */
 function buildUI(){
   $("homeGrid").innerHTML = Object.entries(MODULES).map(([k,m]) => `
     <div class="card">
@@ -1008,7 +1003,6 @@ function updateBottomNav(active){
   const nav = $("nav-" + active); if(nav) nav.classList.add("active");
 }
 
-/* ============ Favoris ============ */
 function favInfo(key){
   if(String(key).startsWith("act:")){
     const a = ACTIONS[key.slice(4)];
@@ -1063,7 +1057,6 @@ async function clearFavorites(){
   appData.favorites = []; saveData(); refreshFavorites(); showToast("Favoris supprimés");
 }
 
-/* ============ Assistant ============ */
 const RULES = [
   ["phone", /numero|telephone|portable|appel|\+41|\b0\d{2}[\s.]?\d{3}/],
   ["scam", /arnaque|scam|suspect|phishing|sms|e-?mail|lien/],
@@ -1119,7 +1112,6 @@ function analyzeAssistant(){
 
 function quickCompany(kind){ const name = assistantCompany; if(!name) return; openExternal(companyUrl(kind, name)); if(kind === "zefix") copyQuiet(name); }
 
-/* ============ Téléphone ============ */
 function normalizePhone(value){
   let p = String(value || "").replace(/[^\d+]/g,"");
   if(p.startsWith("0041")) p = "+41" + p.slice(4);
@@ -1196,7 +1188,6 @@ function renderNumbers(){
 
 function removeNumber(i){ appData.numbers.splice(i,1); saveData(); renderNumbers(); }
 
-/* ============ Entreprise ============ */
 function getCompany(){ return $("companyInput").value.trim(); }
 
 function companyUrl(kind, name){
@@ -1222,7 +1213,6 @@ function companySearch(kind){
 
 function clearCompany(){ $("companyInput").value = ""; $("companyResult").innerHTML = ""; }
 
-/* ============ Argent ============ */
 function renderMoney(){ MONEY_FIELDS.forEach(([k]) => { const el = $("money_" + k); if(el) el.value = appData.money[k] ?? ""; }); }
 
 function getMoneyValues(){
@@ -1256,7 +1246,6 @@ function moneyBars(v){
   }).join("")}<div class="small" style="margin-top:8px">Le loyer apparaît en rouge s'il dépasse environ un tiers du revenu.</div></div>`;
 }
 
-/* ============ Logement ============ */
 const HOUSING_IDS = {place:"housingPlace",canton:"housingCanton",type:"housingType",rooms:"housingRooms",maxRent:"housingMaxRent",availability:"housingAvailability"};
 
 function getHousing(){
@@ -1317,7 +1306,6 @@ function openSubsidizedHousing(){
   $("housingSearchResult").innerHTML = `<div class="result info">🏛️ Page des logements subventionnés de Vaud ouverte.<br>${place ? "Commune recherchée : <strong>" + escapeHtml(place) + "</strong>" : "Cherchez votre commune sur le site."}</div>`;
 }
 
-/* ============ Listes ============ */
 function renderList(key){
   const c = $(key + "List");
   const items = appData[key] || [];
@@ -1363,7 +1351,6 @@ function copyList(key){
   copyText(items.map(i => (i.done ? "[x] " : "[ ] ") + i.text + (i.due ? " (" + fmtDate(i.due) + ")" : "")).join("\n"));
 }
 
-/* ============ Caméra / Scam ============ */
 async function startCamera(){
   if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ showToast("Caméra non disponible"); return; }
   try{
@@ -1496,7 +1483,6 @@ function callCheck(){
   $("callResult").innerHTML = n ? `<div class="result danger"><strong>🚨 Probable arnaque (${n} signal/signaux)</strong><br><br>1. Raccrochez maintenant.<br>2. Ne donnez aucun code, ne faites aucun paiement.<br>3. Rappelez vous-même le numéro officiel.<br>4. Si vous avez payé : banque tout de suite, puis police (117).</div>` : "";
 }
 
-/* ============ Règle loyer / Annonce ============ */
 function rentRule(){
   const income = +(appData.money || {}).income || 0;
   const rent = parseFloat($("housingMaxRent").value) || 0;
@@ -1527,7 +1513,6 @@ function checkListing(){
 
 function clearListing(){ $("listingText").value = ""; $("listingResult").innerHTML = ""; }
 
-/* ============ Contrôleur loyer ============ */
 function rentCalc(){
   const rent = parseFloat($("rRent").value), base = parseFloat($("rBase").value), infl = parseFloat($("rInfl").value) || 0;
   if(!(rent > 0)) return null;
@@ -1585,7 +1570,6 @@ function addRateReminder(){
   showToast("Rappel ajouté pour le " + fmtDate(cand));
 }
 
-/* ============ Assurance maladie ============ */
 const HEALTH_STEPS = ["Recevoir ma lettre de nouvelle prime (au plus tard fin octobre)","Comparer les primes sur priminfo.admin.ch","Comparer franchises et modèles d'assurance","Demander l'offre à la nouvelle caisse avant de résilier","Envoyer la résiliation (recommandé) avant la date limite"];
 
 function lastWorkingDayNov(y){
@@ -1648,7 +1632,6 @@ function addHealthReminder(){
   showToast("Rappel ajouté : une semaine avant la date limite");
 }
 
-/* ============ Aujourd'hui ============ */
 function renderToday(){
   const box = $("todayBox"); if(!box) return;
   const tag = (list, src) => (list || []).map(i => ({...i, src}));
@@ -1666,7 +1649,6 @@ function renderToday(){
     ${bal !== null ? `<div class="row">💰 Solde mensuel : <strong>${formatCHF(bal)}</strong></div>` : ""}</div>`;
 }
 
-/* ============ Validation IBAN/AVS/IDE ============ */
 function ibanValid(v){
   const s = v.replace(/\s/g,"").toUpperCase();
   if(!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(s)) return false;
@@ -1705,7 +1687,6 @@ function validateNumber(){
   out.innerHTML = raw ? `<div class="result ${ok ? "success" : "danger"}">${ok ? "✅" : "❌"} ${escapeHtml(note)}</div>` : `<div class="result warning">Saisissez un numéro.</div>`;
 }
 
-/* ============ QR-facture ============ */
 function parseBill(t){
   const L = t.split(/\r?\n/);
   if(L[0] !== "SPC") return null;
@@ -1755,7 +1736,6 @@ async function addBill(){
 
 function clearBill(){ lastBill = null; $("billResult").innerHTML = ""; $("billFile").value = ""; $("billFile2").value = ""; }
 
-/* ============ Lettres types ============ */
 const LETTERS = {
   bail:(f) => `Objet : Résiliation de bail\n\nMadame, Monsieur,\n\nPar la présente, je résilie mon bail concernant le logement situé ${f.addr}, pour le prochain terme contractuel et dans le respect du délai de congé. ${f.detail}\n\nMerci de me confirmer la réception de ce courrier et de convenir d'une date pour l'état des lieux de sortie.`,
   assurance:(f) => `Objet : Résiliation de mon contrat d'assurance\n\nMadame, Monsieur,\n\nPar la présente, je résilie mon contrat d'assurance pour la prochaine échéance possible. ${f.detail}\n\nMerci de me confirmer par écrit la fin du contrat.`,
@@ -1789,7 +1769,6 @@ function copyLetter(){ const text = $("lOut").dataset.raw || ""; if(!text){ show
 function printLetter(){ const text = $("lOut").dataset.raw || ""; if(!text){ showToast("Générez d'abord la lettre"); return; } window.print(); }
 function clearLetter(){ ["lName","lAddr","lTo","lDetail"].forEach(id => { const el = $(id); if(el) el.value = ""; }); $("lOut").textContent = ""; $("lOut").dataset.raw = ""; }
 
-/* ============ Franchise ============ */
 function franchiseCost(prime, f, costs){ const share = costs <= f ? costs : f + Math.min(0.1 * (costs - f), 700); return prime * 12 + share; }
 
 function compareFranchise(){
@@ -1808,7 +1787,6 @@ function compareFranchise(){
 
 function clearFranchise(){ ["pA","pB","fCosts"].forEach(id => { const el = $(id); if(el) el.value = ""; }); $("fA").value = "300"; $("fB").value = "2500"; $("fResult").innerHTML = ""; }
 
-/* ============ Brut → net ============ */
 function calcNet(){
   const g = parseFloat($("gross").value);
   const lpp = parseFloat($("lppPct").value) || 0, aanp = parseFloat($("aanpPct").value) || 0;
@@ -1823,7 +1801,6 @@ function calcNet(){
 
 function clearNet(){ $("gross").value = ""; $("lppPct").value = "5"; $("aanpPct").value = "1"; $("netResult").innerHTML = ""; }
 
-/* ============ Parcours de vie ============ */
 const LIFE = {
   move:["🚚 Déménagement",[["Informer La Poste du changement d'adresse",-7],["Informer l'assurance maladie et l'employeur",-7],["Mettre à jour assurance ménage et RC",-14],["État des lieux de sortie",0],["Annoncer l'arrivée à la commune (dans les 14 jours)",14],["Récupérer la caution",30]]],
   birth:["👶 Naissance",[["Informer l'employeur (congé, horaires)",-60],["Annoncer la naissance à l'état civil",3],["Affilier l'enfant à une assurance maladie",30],["Demander les allocations familiales",30],["Mettre à jour assurances et testament",90]]],
@@ -1868,7 +1845,6 @@ async function removeLife(){
 
 function clearLife(){ $("lifeType").selectedIndex = 0; $("lifeDate").value = ""; $("lifeResult").innerHTML = ""; }
 
-/* ============ Calendrier ============ */
 const SWISS_DATES = [["🏥 Assurance maladie : résiliation au plus tard le dernier jour ouvrable de novembre",11,30],["💼 3e pilier A : dernier versement de l'année",12,31],["🧾 Déclaration d'impôts (souvent, selon le canton)",3,31]];
 
 function nextDate(m, d){
@@ -1959,7 +1935,6 @@ async function clearCalendar(){
   showToast("Échéances effacées");
 }
 
-/* ============ QR Shield ============ */
 const OFFICIAL = ["post.ch","swisscom.ch","postfinance.ch","sbb.ch","twint.ch","admin.ch","ch.ch","ubs.com","raiffeisen.ch","zkb.ch","migros.ch","coop.ch","sunrise.ch","salt.ch","localsearch.ch","local.ch","search.ch","ncsc.admin.ch","antiphishing.ch"];
 const SHORTENERS = ["bit.ly","tinyurl.com","t.co","goo.gl","is.gd","cutt.ly","rb.gy","ow.ly","shorturl.at"];
 const BAD_TLD = ["xyz","top","click","icu","live","buzz","cyou","cfd","sbs","rest"];
@@ -2056,7 +2031,6 @@ function handleQrShield(e){
 function clearQr(){ lastQr = null; $("qrUrl").value = ""; $("qrResult").innerHTML = ""; }
 function clearValidator(){ $("vInput").value = ""; $("vResult").innerHTML = ""; }
 
-/* ============ Paramètres ============ */
 function restoreApp(){
   appData = loadData(); ensureData(); renderAll();
   $("settingsResult").innerHTML = `<div class="result success">↩️ Les données enregistrées ont été rechargées.</div>`;
@@ -2074,7 +2048,6 @@ async function clearAllData(){
   showToast("Données effacées");
 }
 
-/* ============ Modale ============ */
 let modalPrevFocus = null;
 
 function uiForm(title, fields, ok = "OK"){
@@ -2112,14 +2085,12 @@ function uiForm(title, fields, ok = "OK"){
 
 function uiConfirm(msg, ok = "Confirmer"){ return uiForm("Confirmation", [{text:msg}], ok).then(v => v !== null); }
 
-/* ============ Rendu global ============ */
 function renderAll(){
   refreshFavorites(); renderMoney(); renderHousing();
   renderList("family"); renderList("documents"); renderList("applications");
   renderNumbers(); renderHealth(); renderRent(); renderToday();
 }
 
-/* ============ Bouton retour haut + démarrage ============ */
 function scrollToTop(){ window.scrollTo({top:0,behavior:"smooth"}); }
 function updateBackToTop(){ const b = document.getElementById("backToTop"); if(!b) return; if(window.scrollY > 400) b.classList.add("show"); else b.classList.remove("show"); }
 window.addEventListener("scroll", updateBackToTop, {passive:true});
@@ -2141,3 +2112,4 @@ document.addEventListener("DOMContentLoaded", () => {
 </script>
 </body>
 </html>
+
