@@ -1,10 +1,10 @@
 {
   "name": "Helvetia-Tools",
   "short_name": "Helvetia",
-  "id": "/helvetia-tools/",
+  "id": "./",
   "description": "Assistant suisse pour les démarches du quotidien",
-  "start_url": "/helvetia-tools/",
-  "scope": "/helvetia-tools/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#f4f6f8",
@@ -12,13 +12,13 @@
   "lang": "fr-CH",
   "icons": [
     {
-      "src": "https://bendel89.github.io/helvetia-tools/icon-192.png",
+      "src": "launchericon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "https://bendel89.github.io/helvetia-tools/icon-512.png",
+      "src": "launchericon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
