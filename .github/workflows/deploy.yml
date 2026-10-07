@@ -9,6 +9,8 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/functions/serviceAccount.json
     steps:
       - uses: actions/checkout@v4
 
@@ -27,8 +29,4 @@ jobs:
         run: cd functions && npm install
 
       - name: Deploy to Firebase
-        run: |
-          cd functions
-          npx firebase-tools deploy --only functions --project helvetia-tools --non-interactive
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: functions/serviceAccount.json
+        run: npx firebase-tools deploy --only functions --project helvetia-tools --non-interactive
