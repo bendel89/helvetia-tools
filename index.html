@@ -665,7 +665,7 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.es6.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.0/dist/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
@@ -845,20 +845,15 @@ function showPushMessage(msg, type = "info"){
 }
 
 function initOneSignal(){
-  // Définir le tableau "deferred" AVANT que le SDK ne charge
   window.OneSignalDeferred = window.OneSignalDeferred || [];
 
-  // Pousser la fonction d'init : elle sera exécutée dès que le SDK sera prêt
   window.OneSignalDeferred.push(async function(OneSignal){
     try{
-      // ✅ CORRECTION : chemins explicites vers le sous-dossier helvetia-tools
-      const basePath = "/helvetia-tools/";
-
       await OneSignal.init({
         appId: ONESIGNAL_APP_ID,
         allowLocalhostAsSecureOrigin: true,
-        serviceWorkerParam: { scope: basePath },
-        serviceWorkerPath: basePath + "OneSignalSDKWorker.js",
+        serviceWorkerParam: { scope: "/helvetia-tools/" },
+        serviceWorkerPath: "/helvetia-tools/OneSignalSDKWorker.js",
         notifyButton: { enable: false },
         welcomeNotification: {
           title: "Helvetia-Tools",
@@ -866,7 +861,7 @@ function initOneSignal(){
         }
       });
       oneSignalReady = true;
-      console.log("OneSignal initialisé (basePath:", basePath, ")");
+      console.log("OneSignal initialisé");
       updatePushUI();
       attachOneSignalListeners();
     }catch(e){
@@ -875,7 +870,6 @@ function initOneSignal(){
     }
   });
 
-  // Sécurité : si OneSignal ne charge pas en 30 secondes, afficher un message
   setTimeout(() => {
     if(!oneSignalReady){
       pushStatus("off", "OneSignal ne répond pas. Vérifie la connexion et recharge.");
