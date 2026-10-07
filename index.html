@@ -665,18 +665,12 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.0/dist/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
 <script>
 "use strict";
-
-/* ============================================================
-   CONFIGURATION ONESIGNAL
-   ============================================================ */
-const ONESIGNAL_APP_ID = "c6f48f51-2e18-4cd8-86f9-132277b842b5";
-let oneSignalReady = false;
 
 /* ============================================================
    CONFIGURATION FIREBASE
@@ -690,11 +684,15 @@ const firebaseConfig = {
   appId: "1:125008868109:web:4687d2b05b94701ecf7644"
 };
 
-let fbApp = null, fbAuth = null, fbDb = null;
+const VAPID_KEY = "BPcWlacOhcir34qAeHaBj2z_k9Ei6aoCErOzfQwwKzdPFk2W3GK8mdpyf9UT4W46uZanNM_A2uL0y6GewMUdda0";
+
+let fbApp = null, fbAuth = null, fbDb = null, fbMessaging = null;
 let currentUser = null;
 let firestoreUnsubscribe = null;
 let syncInProgress = false;
 let lastLocalSave = 0;
+let fcmReady = false;
+let fcmToken = null;
 
 try {
   if(typeof firebase !== "undefined"){
@@ -702,6 +700,9 @@ try {
     fbAuth = firebase.auth();
     fbDb = firebase.firestore();
     fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(e => console.warn("Persistance:", e));
+    if(firebase.messaging){
+      try { fbMessaging = firebase.messaging(); } catch(e){ console.warn("FCM init:", e); }
+    }
   } else {
     console.warn("Firebase SDK non chargé");
   }
@@ -825,7 +826,7 @@ function showToast(msg){
 }
 
 /* ============================================================
-   ONESIGNAL — Notifications Push (CORRIGÉ V2)
+   FIREBASE CLOUD MESSAGING (FCM)
    ============================================================ */
 
 function pushStatus(state, text){
@@ -844,50 +845,37 @@ function showPushMessage(msg, type = "info"){
   setTimeout(() => { if(box.innerHTML.includes(msg)) box.innerHTML = ""; }, 5000);
 }
 
-function initOneSignal(){
-  window.OneSignalDeferred = window.OneSignalDeferred || [];
-
-  window.OneSignalDeferred.push(async function(OneSignal){
-    try{
-      await OneSignal.init({
-        appId: ONESIGNAL_APP_ID,
-        allowLocalhostAsSecureOrigin: true,
-        serviceWorkerParam: { scope: "/helvetia-tools-v2/" },
-        serviceWorkerPath: "/helvetia-tools-v2/OneSignalSDKWorker.js",
-        notifyButton: { enable: false },
-        welcomeNotification: {
-          title: "Helvetia-Tools",
-          message: "Merci d'avoir activé les notifications !"
-        }
-      });
-      oneSignalReady = true;
-      console.log("OneSignal initialisé");
-      updatePushUI();
-      attachOneSignalListeners();
-    }catch(e){
-      console.error("Erreur init OneSignal:", e);
-      pushStatus("off", "Erreur : " + (e.message || "inconnue"));
-    }
-  });
-
-  setTimeout(() => {
-    if(!oneSignalReady){
-      pushStatus("off", "OneSignal ne répond pas. Vérifie la connexion et recharge.");
-    }
-  }, 30000);
-}
-
-function attachOneSignalListeners(){
+function initFCM(){
   try{
-    if(typeof OneSignal === "undefined") return;
-    if(OneSignal.User && OneSignal.User.PushSubscription && OneSignal.User.PushSubscription.addEventListener){
-      OneSignal.User.PushSubscription.addEventListener("change", () => updatePushUI());
+    if(typeof firebase === "undefined" || !firebase.messaging){
+      pushStatus("off", "Firebase Messaging non disponible");
+      return;
     }
-    if(OneSignal.Notifications && OneSignal.Notifications.addEventListener){
-      OneSignal.Notifications.addEventListener("permissionChange", () => updatePushUI());
+
+    // Enregistrer le Service Worker Firebase
+    if("serviceWorker" in navigator){
+      navigator.serviceWorker.register("/helvetia-tools-v2/firebase-messaging-sw.js", {scope: "/helvetia-tools-v2/"})
+        .then(reg => console.log("SW Firebase enregistré :", reg.scope))
+        .catch(err => console.warn("Erreur SW Firebase :", err));
     }
+
+    // Écouter les messages en premier plan
+    const messaging = firebase.messaging();
+    messaging.onMessage((payload) => {
+      console.log("Message foreground :", payload);
+      const title = (payload.notification && payload.notification.title) || "Helvetia-Tools";
+      const body = (payload.notification && payload.notification.body) || "";
+      if(typeof Notification !== "undefined" && Notification.permission === "granted"){
+        new Notification(title, {body, icon: "/helvetia-tools-v2/launchericon-192x192.png"});
+      }
+    });
+
+    fcmReady = true;
+    console.log("FCM initialisé");
+    updatePushUI();
   }catch(e){
-    console.warn("Listener OneSignal:", e);
+    console.error("Erreur init FCM :", e);
+    pushStatus("off", "Erreur : " + (e.message || "inconnue"));
   }
 }
 
@@ -896,7 +884,7 @@ function updatePushUI(){
   const testBtn = $("pushTestBtn");
   if(!btn) return;
 
-  if(!oneSignalReady || typeof OneSignal === "undefined"){
+  if(!fcmReady){
     pushStatus("pending", "Chargement…");
     btn.disabled = false;
     btn.style.opacity = "";
@@ -906,10 +894,9 @@ function updatePushUI(){
   }
 
   try{
-    const isSubscribed = OneSignal.User && OneSignal.User.PushSubscription && OneSignal.User.PushSubscription.optedIn;
     const permission = (typeof Notification !== "undefined") ? Notification.permission : "default";
 
-    if(isSubscribed){
+    if(permission === "granted" && fcmToken){
       pushStatus("on", "✅ Notifications activées");
       btn.textContent = "✅ Notifications actives";
       btn.disabled = true;
@@ -934,39 +921,44 @@ function updatePushUI(){
 }
 
 async function enablePushNotifications(){
-  if(!oneSignalReady || typeof OneSignal === "undefined"){
-    showPushMessage("Patientez, OneSignal n'est pas encore prêt…", "warning");
+  if(!fcmReady){
+    showPushMessage("Patientez, Firebase n'est pas encore prêt…", "warning");
     return;
   }
   try{
-    await OneSignal.Notifications.requestPermission();
-    await OneSignal.User.PushSubscription.optIn();
-    if(currentUser){
-      try{
-        await OneSignal.login(currentUser.uid);
-        if(currentUser.email) await OneSignal.User.addEmail(currentUser.email);
-      }catch(e){ console.warn("Liaison OneSignal:", e); }
+    const permission = await Notification.requestPermission();
+    if(permission !== "granted"){
+      showPushMessage("Permission refusée. Vérifiez les réglages iPhone.", "danger");
+      updatePushUI();
+      return;
     }
-    try{
-      await OneSignal.User.addTags({
-        platform: "pwa",
-        appName: "Helvetia-Tools"
-      });
-    }catch(e){}
-    showPushMessage("✅ Notifications activées ! Vous recevrez les rappels importants.", "success");
-    setTimeout(() => updatePushUI(), 500);
+    const messaging = firebase.messaging();
+    const token = await messaging.getToken({vapidKey: VAPID_KEY});
+    if(token){
+      fcmToken = token;
+      console.log("Token FCM obtenu :", token.substring(0,20) + "...");
+      if(currentUser && fbDb){
+        try{
+          await fbDb.collection("users").doc(currentUser.uid).set({fcmToken: token, fcmUpdatedAt: Date.now()}, {merge:true});
+        }catch(e){ console.warn("Erreur sauvegarde token :", e); }
+      }
+      showPushMessage("✅ Notifications activées !", "success");
+    } else {
+      showPushMessage("Impossible d'obtenir le token FCM.", "danger");
+    }
+    updatePushUI();
   }catch(e){
-    console.error("Erreur activation push:", e);
-    showPushMessage("Impossible d'activer les notifications. Vérifiez vos réglages iPhone.", "danger");
+    console.error("Erreur activation FCM :", e);
+    showPushMessage("Erreur : " + (e.message || "inconnue"), "danger");
   }
 }
 
 function sendTestNotification(){
-  showPushMessage("Un test doit être envoyé depuis le tableau de bord OneSignal.", "info");
+  showPushMessage("Un test doit être envoyé depuis la console Firebase.", "info");
 }
 
 /* ============================================================
-   FIREBASE CLOUD SYNC
+   FIREBASE CLOUD SYNC (Firestore)
    ============================================================ */
 
 function cloudStatus(state, text){
@@ -1162,12 +1154,6 @@ function initFirebaseAuth(){
       }catch(e){
         showCloudMessage("⚠️ Synchronisation impossible pour l'instant", "warning");
       }
-      if(oneSignalReady && typeof OneSignal !== "undefined"){
-        try{
-          await OneSignal.login(user.uid);
-          if(user.email) await OneSignal.User.addEmail(user.email);
-        }catch(e){ console.warn("Liaison OneSignal:", e); }
-      }
     } else {
       showCloudMessage("Déconnecté. Données locales uniquement.", "info");
       if(firestoreUnsubscribe){ firestoreUnsubscribe(); firestoreUnsubscribe = null; }
@@ -1332,7 +1318,7 @@ function calcTaxes(){
     Revenu imposable : <strong>${formatCHF(base)}</strong><br>
     Impôt annuel estimé : <strong>${formatCHF(tax)}</strong><br>
     Taux effectif : <strong>${eff} %</strong><br><br>
-    <span class="small">⚠️ Estimation indicative basée sur barèmes 2024 (personne sans fortune, sans enfants). Votre vrai impôt dépend de votre fortune, enfants, frais de transport, cotisations LPP/3e pilier, etc. Consultez l'administration fiscale de votre canton.</span></div>`;
+    <span class="small">⚠️ Estimation indicative basée sur barèmes 2024. Consultez l'administration fiscale.</span></div>`;
 }
 function clearTaxes(){
   ["taxIncome","taxDeductions"].forEach(id => { const el = $(id); if(el) el.value = ""; });
@@ -1360,10 +1346,8 @@ function calcPrimeRange(){
   const high = base * 1.30;
   out.innerHTML = `<div class="result success"><strong>💰 Estimation prime mensuelle</strong><br><br>
     Canton : <strong>${escapeHtml(canton)}</strong><br>
-    Profil : <strong>${escapeHtml(age === "young" ? "18-25 ans" : age === "senior" ? "51-65 ans" : "26-50 ans")}</strong> · ${escapeHtml(model)}<br>
-    Franchise : <strong>CHF ${franchise}</strong><br><br>
     Fourchette : <strong>CHF ${Math.round(low)} – ${Math.round(high)} / mois</strong><br><br>
-    <span class="small">⚠️ Estimation basée sur des moyennes 2025. Les vraies primes varient fortement selon la caisse. Comparez sur priminfo.admin.ch.</span></div>`;
+    <span class="small">⚠️ Estimation basée sur des moyennes 2025. Comparez sur priminfo.admin.ch.</span></div>`;
 }
 function clearPrimeRange(){ $("pPrimeResult").innerHTML = ""; }
 
@@ -1587,8 +1571,7 @@ function analyzeAssistant(){
       <button type="button" class="btn" onclick="quickCompany('local')">📞 local.ch</button>
       <button type="button" class="btn" onclick="quickCompany('google')">🌐 Google</button>
       <button type="button" class="btn blue" onclick="routeTo('company', $('assistantInput').value)">Ouvrir Entreprise</button>
-    </div>
-    <div class="small" style="margin-top:8px">Astuce : Zefix est le registre officiel suisse.</div></div>`;
+    </div></div>`;
 }
 
 function quickCompany(kind){ const name = assistantCompany; if(!name) return; openExternal(companyUrl(kind, name)); if(kind === "zefix") copyQuiet(name); }
@@ -1632,7 +1615,6 @@ function checkPhone(){
     <div class="row">🟢 Pays : Suisse</div>
     <div class="row">🟢 Préfixe : +41 ${prefix}</div>
     <div class="row">🟢 Type : ${escapeHtml(type)}</div>
-    <div class="row">🟢 Format : reconnu</div>
     <div class="btn-row"><button type="button" class="btn primary" onclick="copyText($('phoneInput').value)">📋 Copier</button></div></div>`;
 }
 
@@ -1688,7 +1670,7 @@ function checkCompany(){
   const name = getCompany();
   if(!name){ $("companyResult").innerHTML = `<div class="result warning">Entrez le nom d'une entreprise.</div>`; return; }
   openExternal(companyUrl("zefix", name));
-  $("companyResult").innerHTML = `<div class="result success">🏢 Zefix (registre officiel suisse) ouvert pour « ${escapeHtml(name)} ».<br>Vous pouvez aussi essayer local.ch ou Google ci-dessous.</div>`;
+  $("companyResult").innerHTML = `<div class="result success">🏢 Zefix ouvert pour « ${escapeHtml(name)} ».</div>`;
 }
 
 function companySearch(kind){
@@ -1720,21 +1702,11 @@ function calculateMoney(){
     Revenus : <strong>${formatCHF(v.income)}</strong><br>
     Dépenses : <strong>${formatCHF(expenses)}</strong><br>
     Solde : <strong>${formatCHF(balance)}</strong><br><br>
-    ${balance >= 0 ? "✅ Votre budget est positif." : "⚠️ Vos dépenses dépassent vos revenus."}</div>` + moneyBars(v);
+    ${balance >= 0 ? "✅ Votre budget est positif." : "⚠️ Vos dépenses dépassent vos revenus."}</div>`;
 }
 
 function saveMoney(){ appData.money = getMoneyValues(); saveData(); calculateMoney(); showToast("Budget enregistré"); }
 function clearMoney(){ appData.money = {}; saveData(); renderMoney(); $("moneyResult").innerHTML = ""; showToast("Budget effacé"); }
-
-function moneyBars(v){
-  if(!v.income) return "";
-  const labels = {rent:"Loyer",insurance:"Assurance",food:"Nourriture",transport:"Transport",bills:"Factures",subscriptions:"Abonnements",other:"Autres"};
-  return `<div class="result" style="background:var(--card);border:1px solid var(--border)"><strong>📊 Part du revenu</strong>${Object.keys(labels).filter(k => v[k] > 0).map(k => {
-    const pct = Math.round(v[k] / v.income * 100);
-    return `<div style="margin-top:9px"><div class="small" style="display:flex;justify-content:space-between"><span>${labels[k]}</span><span>${formatCHF(v[k])} · ${pct} %</span></div>
-      <div style="height:9px;background:#eef0f2;border-radius:6px;overflow:hidden"><div style="height:100%;width:${Math.min(100,pct)}%;background:${k === "rent" && pct > 33 ? "var(--red)" : "var(--blue)"}"></div></div></div>`;
-  }).join("")}<div class="small" style="margin-top:8px">Le loyer apparaît en rouge s'il dépasse environ un tiers du revenu.</div></div>`;
-}
 
 /* ============================================================
    Logement
@@ -1755,12 +1727,10 @@ function renderHousing(){
   Object.entries(HOUSING_IDS).forEach(([k,id]) => { $(id).value = h[k] || ""; });
   $("housingSubsidized").checked = !!h.subsidized;
   toggleSubsidy();
-  const q = buildHousingQuery();
-  $("housingSavedResult").innerHTML = q ? `<div class="result success">✅ Recherche enregistrée<br>${escapeHtml(q)}</div>` : "";
 }
 
-function saveHousing(show = true){ appData.housing = getHousing(); saveData(); renderHousing(); if(show) showToast("Recherche logement enregistrée"); }
-function clearHousing(){ appData.housing = {}; saveData(); renderHousing(); $("housingSearchResult").innerHTML = ""; showToast("Recherche logement effacée"); }
+function saveHousing(show = true){ appData.housing = getHousing(); saveData(); if(show) showToast("Recherche logement enregistrée"); }
+function clearHousing(){ appData.housing = {}; saveData(); showToast("Recherche logement effacée"); }
 
 function buildHousingQuery(){
   const h = getHousing(), p = [];
@@ -1770,34 +1740,13 @@ function buildHousingQuery(){
   if(h.rooms) p.push(h.rooms + " pièces minimum");
   if(h.maxRent) p.push("loyer maximum " + h.maxRent + " CHF");
   if(h.availability) p.push("disponibilité " + h.availability);
-  if(h.subsidized) p.push("logement subventionné");
   return p.join(" | ");
 }
 
 function copyHousingCriteria(){ const q = buildHousingQuery(); if(!q){ showToast("Remplissez au moins un critère"); return; } copyText(q); }
-
-function housingPortal(name, url){
-  const q = buildHousingQuery();
-  if(!q){ showToast("Remplissez d'abord vos critères"); return; }
-  saveHousing(false); openExternal(url); copyQuiet(q);
-  $("housingSearchResult").innerHTML = `<div class="result success"><strong>🔎 ${escapeHtml(name)} ouvert</strong><br><br>${escapeHtml(q)}<br><br>📋 Critères copiés : collez-les dans la recherche du portail.</div>`;
-}
-
-function searchHousingGoogle(){
-  const q = buildHousingQuery();
-  if(!q){ showToast("Remplissez d'abord vos critères"); return; }
-  saveHousing(false);
-  const g = "logement location Suisse " + q.replace(/\|/g," ");
-  openExternal("https://www.google.com/search?q=" + encodeURIComponent(g));
-  $("housingSearchResult").innerHTML = `<div class="result info">🌐 Google recherche :<br><strong>${escapeHtml(g)}</strong></div>`;
-}
-
-function openSubsidizedHousing(){
-  const place = $("housingPlace").value.trim();
-  saveHousing(false);
-  openExternal("https://www.vd.ch/territoire-et-construction/logement/aides-et-subventions/logements-subventionnes-aide-a-la-pierre/trouver-un-logement");
-  $("housingSearchResult").innerHTML = `<div class="result info">🏛️ Page des logements subventionnés de Vaud ouverte.<br>${place ? "Commune recherchée : <strong>" + escapeHtml(place) + "</strong>" : "Cherchez votre commune sur le site."}</div>`;
-}
+function housingPortal(name, url){ const q = buildHousingQuery(); saveHousing(false); openExternal(url); copyQuiet(q); showToast(name + " ouvert"); }
+function searchHousingGoogle(){ const q = buildHousingQuery(); saveHousing(false); openExternal("https://www.google.com/search?q=" + encodeURIComponent("logement location Suisse " + q)); }
+function openSubsidizedHousing(){ saveHousing(false); openExternal("https://www.vd.ch/territoire-et-construction/logement/aides-et-subventions/logements-subventionnes-aide-a-la-pierre/trouver-un-logement"); }
 
 /* ============================================================
    Listes
@@ -1811,9 +1760,9 @@ function renderList(key){
     const late = it.due && !it.done && it.due < todayStr();
     return `<div class="item"><label><input type="checkbox" ${it.done ? "checked" : ""} onchange="toggleItem('${key}',${i})">
       <span><span class="${it.done ? "done" : ""}">${escapeHtml(it.text)}</span>
-      ${it.due ? `<span class="badge ${late ? "late" : ""}">${late ? "⚠️ En retard : " : "📅 Échéance : "}${fmtDate(it.due)}</span>` : ""}</span></label>
-      <button type="button" class="share-btn" onclick="shareItem('${key}',${i})" aria-label="Partager">📤</button>
-      <button type="button" onclick="removeItem('${key}',${i})" aria-label="Supprimer" style="margin-left:4px">×</button></div>`;
+      ${it.due ? `<span class="badge ${late ? "late" : ""}">${late ? "⚠️ En retard : " : "📅 "}${fmtDate(it.due)}</span>` : ""}</span></label>
+      <button type="button" class="share-btn" onclick="shareItem('${key}',${i})">📤</button>
+      <button type="button" onclick="removeItem('${key}',${i})" style="margin-left:4px">×</button></div>`;
   }).join("")}</div>`;
 }
 
@@ -1851,7 +1800,7 @@ function copyList(key){
    Caméra / Scam
    ============================================================ */
 async function startCamera(){
-  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ showToast("Caméra non disponible"); return; }
+  if(!navigator.mediaDevices){ showToast("Caméra non disponible"); return; }
   try{
     cameraStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}, audio:false});
     $("cameraVideo").srcObject = cameraStream;
@@ -1881,10 +1830,9 @@ function handleScamFile(event){
   const file = event.target.files[0]; if(!file) return;
   if(file.type.startsWith("image/")){
     const r = new FileReader();
-    r.onload = e => { lastScamImage = e.target.result; $("scamPreview").src = lastScamImage; $("scamPreview").classList.remove("hidden"); showToast("Photo chargée"); };
-    r.readAsDataURL(file); return;
+    r.onload = e => { lastScamImage = e.target.result; $("scamPreview").src = lastScamImage; $("scamPreview").classList.remove("hidden"); };
+    r.readAsDataURL(file);
   }
-  showToast("Pour un PDF, copiez-collez le texte.");
 }
 
 async function readQR(src){
@@ -1914,17 +1862,17 @@ function decodeJsQR(src, w, h, sizes = [1600,1000,2400]){
 async function extractOCR(){
   const result = $("scamResult");
   if(!lastScamImage){ result.innerHTML = `<div class="result warning">Prenez ou choisissez d'abord une photo.</div>`; return; }
-  result.innerHTML = `<div class="result info">🔤 Lecture de l'image en cours...</div>`;
+  result.innerHTML = `<div class="result info">🔤 Lecture...</div>`;
   const qr = await readQR(lastScamImage);
   if(qr){ $("scamText").value = "QR code : " + qr; analyzeScamText(); return; }
-  if(typeof Tesseract === "undefined"){ result.innerHTML = `<div class="result danger">Le moteur de lecture n'est pas chargé.</div>`; return; }
+  if(typeof Tesseract === "undefined"){ result.innerHTML = `<div class="result danger">Moteur non chargé.</div>`; return; }
   try{
     const out = await Tesseract.recognize(lastScamImage, "fra+eng");
     const text = out.data.text.trim();
     $("scamText").value = text;
     if(text) analyzeScamText();
-    else result.innerHTML = `<div class="result warning">Aucun texte ni QR lisible.</div>`;
-  }catch(e){ result.innerHTML = `<div class="result danger">❌ Impossible de lire cette image.</div>`; }
+    else result.innerHTML = `<div class="result warning">Aucun texte lisible.</div>`;
+  }catch(e){ result.innerHTML = `<div class="result danger">❌ Lecture impossible.</div>`; }
 }
 
 function clearScam(){
@@ -1940,46 +1888,31 @@ function analyzeScamText(){
   if(!text){ result.innerHTML = `<div class="result warning">Ajoutez un texte à analyser.</div>`; return; }
   const lower = normalizeText(text);
   let score = 0; const reasons = [];
-
-  const words = ["urgent","urgence","cliquez","cliquer","mot de passe","password","verification","compte bloque","paiement","payer","remboursement","amende","cadeau","gagne","lotterie","loterie","bitcoin","crypto","virement","iban","carte bancaire","credit card","interpol","police","douane","colis","livraison","facture impayee","suspendu","bloque"];
-  words.forEach(w => { if(lower.includes(w)){ score += 10; reasons.push("Élément typique d'arnaque : « " + w + " »"); } });
-
+  const words = ["urgent","urgence","cliquez","mot de passe","password","paiement","remboursement","amende","cadeau","gagne","bitcoin","crypto","virement","iban","colis","suspendu","bloque"];
+  words.forEach(w => { if(lower.includes(w)){ score += 10; reasons.push("Élément d'arnaque : « " + w + " »"); } });
   const mentionsCode = /\bcode\b/.test(lower);
-  const mentionsSms = /(sms|texto|telephone|mobile|portable)/.test(lower);
-  const askGive = /(donner|donne|donnez|communiquer|communique|envoyer|envoie|envoyez|partager|partage|transmettre|transmet|confirmer|valider|saisir|saisissez|inscrire|entrer|entrez|taper|tapez|recopier|recopie)/.test(lower);
-
-  if(mentionsCode && mentionsSms){ score += 35; reasons.push("🚨 Demande de code reçu par SMS"); }
-  if(mentionsCode && askGive){ score += 30; reasons.push("🚨 On vous demande de communiquer un code confidentiel"); }
-  if(mentionsCode && mentionsSms && askGive){ score += 25; reasons.push("🚨 ARNAQUE TRÈS PROBABLE : code SMS demandé"); }
-
-  if(/interpol|police|fbi|douane|autorite|justice/i.test(text)){ score += 20; reasons.push("🚨 Usurpation d'autorité"); }
-  if(/votre compte|votre carte|votre colis|votre amende|votre facture/i.test(text)){ score += 15; reasons.push("Prétexte personnel pour vous faire agir"); }
-
-  if(/https?:\/\//i.test(text)){ score += 15; reasons.push("Contient un lien Internet."); }
-  if(/bit\.ly|tinyurl|t\.co|goo\.gl|is\.gd|rebrand\.ly/i.test(text)){ score += 25; reasons.push("Lien raccourci (destination cachée)."); }
-  if(/\+41\s?7\d/.test(text)){ score += 5; reasons.push("Contient un numéro mobile suisse."); }
-  if(/[A-Z]{4,}/.test(text)){ score += 5; reasons.push("Utilise beaucoup de majuscules."); }
-  if(/!\s*!|!!+/.test(text)){ score += 5; reasons.push("Forte pression visuelle."); }
-
+  const mentionsSms = /(sms|texto|mobile)/.test(lower);
+  const askGive = /(donner|communiquer|envoyer|partager|transmettre|valider|saisir)/.test(lower);
+  if(mentionsCode && mentionsSms){ score += 35; reasons.push("🚨 Demande de code SMS"); }
+  if(mentionsCode && askGive){ score += 30; reasons.push("🚨 Code confidentiel demandé"); }
+  if(/https?:\/\//i.test(text)){ score += 15; reasons.push("Contient un lien"); }
+  if(/bit\.ly|tinyurl|t\.co|goo\.gl/i.test(text)){ score += 25; reasons.push("Lien raccourci"); }
   score = Math.min(100, score);
   const level = score >= 60 ? "Élevé" : score >= 30 ? "Moyen" : "Faible";
   const cls = score >= 60 ? "danger" : score >= 30 ? "warning" : "success";
-  if(!reasons.length) reasons.push("Aucun signal évident détecté.");
-
-  result.innerHTML = `<div class="result ${cls}"><div class="risk-score">${score}/100</div><strong>Niveau de risque : ${level}</strong><br><br>
-    <strong>🔎 Signaux détectés :</strong><ul style="margin:8px 0 0 20px">${reasons.map(r => `<li>${escapeHtml(r)}</li>`).join("")}</ul><br>
-    <strong>⚠️ Important :</strong> cette analyse est une aide automatique et ne garantit rien.</div>`;
+  if(!reasons.length) reasons.push("Aucun signal évident.");
+  result.innerHTML = `<div class="result ${cls}"><div class="risk-score">${score}/100</div><strong>Risque : ${level}</strong><ul style="margin:8px 0 0 20px">${reasons.map(r => `<li>${escapeHtml(r)}</li>`).join("")}</ul></div>`;
 }
 
-const CALL_FLAGS = ["Demande un code reçu par SMS ou un mot de passe","Demande un virement, un paiement ou des cartes cadeau","Demande d'installer une application ou de prendre le contrôle de l'appareil","Se dit banque, police ou support et presse à agir vite","Demande de ne parler à personne ou de rester en ligne","Numéro masqué ou étranger"];
+const CALL_FLAGS = ["Demande un code SMS ou mot de passe","Demande un virement ou paiement","Demande d'installer une application","Se dit banque/police et presse à agir","Demande de ne parler à personne","Numéro masqué ou étranger"];
 
 function buildCallList(){
-  $("callList").innerHTML = CALL_FLAGS.map((t,i) => `<div class="item"><label><input type="checkbox" class="callflag" onchange="callCheck()"><span>${escapeHtml(t)}</span></label></div>`).join("");
+  $("callList").innerHTML = CALL_FLAGS.map(t => `<div class="item"><label><input type="checkbox" class="callflag" onchange="callCheck()"><span>${escapeHtml(t)}</span></label></div>`).join("");
 }
 
 function callCheck(){
   const n = document.querySelectorAll(".callflag:checked").length;
-  $("callResult").innerHTML = n ? `<div class="result danger"><strong>🚨 Probable arnaque (${n} signal/signaux)</strong><br><br>1. Raccrochez maintenant.<br>2. Ne donnez aucun code, ne faites aucun paiement.<br>3. Rappelez vous-même le numéro officiel.<br>4. Si vous avez payé : banque tout de suite, puis police (117).</div>` : "";
+  $("callResult").innerHTML = n ? `<div class="result danger"><strong>🚨 Probable arnaque (${n} signaux)</strong><br>1. Raccrochez.<br>2. Ne donnez aucun code.<br>3. Rappelez le numéro officiel.</div>` : "";
 }
 
 /* ============================================================
@@ -1989,10 +1922,10 @@ function rentRule(){
   const income = +(appData.money || {}).income || 0;
   const rent = parseFloat($("housingMaxRent").value) || 0;
   const out = $("rentRuleResult");
-  if(!income){ out.innerHTML = `<div class="result warning">Renseignez d'abord vos revenus dans « Argent ».</div>`; return; }
+  if(!income){ out.innerHTML = `<div class="result warning">Renseignez vos revenus dans « Argent ».</div>`; return; }
   const max = Math.round(income / 3);
   const ok = !rent || rent <= max;
-  out.innerHTML = `<div class="result ${ok ? "success" : "warning"}">Règle courante : le loyer ne dépasse pas environ 1/3 du revenu.<br>Loyer conseillé max : <strong>${formatCHF(max)}</strong>${rent ? `<br>Votre plafond : <strong>${formatCHF(rent)}</strong> ${ok ? "✅" : "⚠️"}` : ""}<br><span class="small">Indication générale.</span></div>`;
+  out.innerHTML = `<div class="result ${ok ? "success" : "warning"}">Loyer conseillé max : <strong>${formatCHF(max)}</strong>${rent ? `<br>Votre plafond : <strong>${formatCHF(rent)}</strong> ${ok ? "✅" : "⚠️"}` : ""}</div>`;
 }
 
 function checkListing(){
@@ -2002,15 +1935,15 @@ function checkListing(){
   const t = normalizeText(text);
   const flags = [
     [/western union|moneygram|bitcoin|crypto|carte cadeau/, "Paiement non traçable"],
-    [/avant (la |de )?visite|sans visite|visite impossible|ne peux pas (visiter|venir)/, "Paiement sans visite"],
-    [/a l'etranger|en mission|missionnaire|voyage|pas en suisse/, "Propriétaire absent"],
-    [/cles par (la )?poste|envoie.*cles|remise des cles par/, "Remise des clés par envoi"],
-    [/acompte|depot de garantie.*(virement|avance)|payer.*(avance|d'avance)/, "Argent demandé à l'avance"],
-    [/whatsapp|telegram/, "Contact uniquement par messagerie"],
-    [/urgent|derniere chance|plusieurs interesses/, "Pression pour décider vite"]
+    [/avant (la |de )?visite|sans visite/, "Paiement sans visite"],
+    [/a l'etranger|en mission|pas en suisse/, "Propriétaire absent"],
+    [/cles par (la )?poste/, "Remise des clés par envoi"],
+    [/acompte|depot de garantie.*avance/, "Argent à l'avance"],
+    [/whatsapp|telegram/, "Contact par messagerie uniquement"],
+    [/urgent|derniere chance/, "Pression pour décider vite"]
   ].filter(([re]) => re.test(t)).map(f => f[1]);
   const cls = flags.length >= 3 ? "danger" : flags.length ? "warning" : "success";
-  out.innerHTML = `<div class="result ${cls}"><strong>${flags.length >= 3 ? "🚨 Risque élevé" : flags.length ? "⚠️ À vérifier" : "✅ Aucun signal évident"}</strong>${flags.length ? "<ul style='margin:8px 0 0 20px'>" + flags.map(f => `<li>${escapeHtml(f)}</li>`).join("") + "</ul>" : ""}<br><span class="small">Visitez toujours et ne payez rien avant le bail.</span></div>`;
+  out.innerHTML = `<div class="result ${cls}"><strong>${flags.length >= 3 ? "🚨 Risque élevé" : flags.length ? "⚠️ À vérifier" : "✅ Aucun signal évident"}</strong>${flags.length ? "<ul style='margin:8px 0 0 20px'>" + flags.map(f => `<li>${escapeHtml(f)}</li>`).join("") + "</ul>" : ""}</div>`;
 }
 
 function clearListing(){ $("listingText").value = ""; $("listingResult").innerHTML = ""; }
@@ -2029,18 +1962,13 @@ function rentCalc(){
 
 function calcRent(){
   const c = rentCalc(), out = $("rentResult");
-  if(!c){ out.innerHTML = `<div class="result warning">Saisissez votre loyer net actuel.</div>`; return; }
+  if(!c){ out.innerHTML = `<div class="result warning">Saisissez votre loyer.</div>`; return; }
   appData.rent = {rent:c.rent, base:c.base, infl:c.infl, indexed:c.indexed};
   saveData(); lastRent = c;
-  if(c.indexed){ out.innerHTML = `<div class="result warning">Un bail indexé ou échelonné ne donne pas droit à une baisse liée au taux de référence.</div>`; return; }
-  if(c.steps <= 0){ out.innerHTML = `<div class="result info">Votre loyer repose déjà sur le taux actuel ou moins.</div>`; return; }
+  if(c.indexed){ out.innerHTML = `<div class="result warning">Bail indexé : pas de baisse liée au taux.</div>`; return; }
+  if(c.steps <= 0){ out.innerHTML = `<div class="result info">Loyer déjà au taux actuel.</div>`; return; }
   const save = c.rent - c.newRent;
-  out.innerHTML = `<div class="result ${save > 0 ? "success" : "warning"}"><strong>⚖️ Estimation</strong><br><br>
-    Écart de taux : ${c.steps} quart(s) de point<br>
-    Baisse estimée : <strong>${(c.net * 100).toFixed(2)} %</strong><br>
-    Loyer net estimé : <strong>${formatCHF(c.newRent)}</strong>/mois<br>
-    Économie : <strong>${formatCHF(save)}</strong>/mois, soit <strong>${formatCHF(save * 12)}</strong>/an<br><br>
-    <span class="small">Environ 2,91 % par quart de point, moins 40 % de l'inflation répercutable.</span></div>`;
+  out.innerHTML = `<div class="result success"><strong>⚖️ Estimation</strong><br>Baisse estimée : <strong>${(c.net * 100).toFixed(2)} %</strong><br>Loyer net estimé : <strong>${formatCHF(c.newRent)}</strong>/mois<br>Économie : <strong>${formatCHF(save * 12)}</strong>/an</div>`;
 }
 
 function renderRent(){
@@ -2057,28 +1985,23 @@ function clearRent(){
 
 function rentLetter(){
   const c = rentCalc(); if(!c){ showToast("Saisissez d'abord votre loyer"); return; }
-  const base = String(c.base).replace(".", ",");
   openPanel("tools"); $("lType").value = "loyer";
-  $("lDetail").value = c.steps > 0 && !c.indexed
-    ? `Mon loyer actuel (CHF ${c.rent.toFixed(2)}) repose sur un taux de référence de ${base} %. Je vous demande de le réduire à CHF ${c.newRent.toFixed(2)} dès le prochain terme possible.`
-    : `Mon loyer actuel est de CHF ${c.rent.toFixed(2)}. Vérifiez s'il peut être réduit.`;
-  setTimeout(() => $("lType").scrollIntoView({behavior:"smooth", block:"center"}), 150);
+  $("lDetail").value = `Mon loyer actuel (CHF ${c.rent.toFixed(2)}) repose sur un taux de référence de ${String(c.base).replace(".",",")} %. Je demande une réduction à CHF ${c.newRent.toFixed(2)}.`;
 }
 
 function addRateReminder(){
-  const now = new Date(), y = now.getFullYear();
+  const y = new Date().getFullYear();
   const cand = [[y,3],[y,6],[y,9],[y,12],[y+1,3]].map(([yy,m]) => yy + "-" + String(m).padStart(2,"0") + "-01").find(d => d > todayStr());
-  const text = "⚖️ Vérifier le nouveau taux de référence des loyers (publication début du mois)";
+  const text = "⚖️ Vérifier le taux de référence des loyers";
   if(appData.documents.some(d => d.text === text)){ showToast("Rappel déjà ajouté"); return; }
   appData.documents.push({text, done:false, due:cand});
-  saveData(); renderList("documents"); renderToday();
-  showToast("Rappel ajouté pour le " + fmtDate(cand));
+  saveData(); renderList("documents"); showToast("Rappel ajouté");
 }
 
 /* ============================================================
    Assurance maladie
    ============================================================ */
-const HEALTH_STEPS = ["Recevoir ma lettre de nouvelle prime (au plus tard fin octobre)","Comparer les primes sur priminfo.admin.ch","Comparer franchises et modèles d'assurance","Demander l'offre à la nouvelle caisse avant de résilier","Envoyer la résiliation (recommandé) avant la date limite"];
+const HEALTH_STEPS = ["Recevoir la nouvelle prime","Comparer sur priminfo.admin.ch","Comparer franchises","Demander offre nouvelle caisse","Envoyer résiliation avant date limite"];
 
 function lastWorkingDayNov(y){
   const d = new Date(y, 10, 30, 12);
@@ -2093,9 +2016,7 @@ function renderHealth(){
   const dl = healthDeadline(), days = healthDays();
   const h = appData.health || {};
   const cls = days <= 14 ? "danger" : days <= 45 ? "warning" : "info";
-  $("healthCountdown").innerHTML = `<div class="result ${cls}" style="margin:0"><strong>⏳ Date limite de résiliation : ${fmtDate(dl)}</strong><br>
-    ${days === 0 ? "C'est aujourd'hui !" : "Il reste <strong>" + days + " jour(s)</strong>."} C'est le dernier jour ouvrable de novembre.<br>
-    <span class="small">Les assureurs doivent vous informer de votre nouvelle prime par écrit au plus tard fin octobre.</span></div>`;
+  $("healthCountdown").innerHTML = `<div class="result ${cls}" style="margin:0"><strong>⏳ Date limite : ${fmtDate(dl)}</strong><br>Il reste <strong>${days} jour(s)</strong>.</div>`;
   if(h.prime) $("hPrime").value = h.prime;
   if(h.pct !== undefined) $("hPct").value = h.pct;
   const checks = h.checks || [];
@@ -2112,14 +2033,10 @@ function toggleHealthStep(i){
 function calcHealth(){
   const prime = parseFloat($("hPrime").value), pct = parseFloat($("hPct").value);
   const out = $("healthResult");
-  if(!Number.isFinite(prime) || prime <= 0 || !Number.isFinite(pct)){ out.innerHTML = `<div class="result warning">Saisissez votre prime actuelle et la hausse estimée.</div>`; return; }
+  if(!Number.isFinite(prime) || !Number.isFinite(pct)){ out.innerHTML = `<div class="result warning">Saisissez les valeurs.</div>`; return; }
   const next = prime * (1 + pct / 100), diff = next - prime;
   appData.health = Object.assign({}, appData.health, {prime, pct}); saveData();
-  out.innerHTML = `<div class="result ${diff > 0 ? "warning" : "success"}"><strong>Estimation 2027</strong><br><br>
-    Prime actuelle : <strong>${formatCHF(prime)}</strong>/mois<br>
-    Prime estimée : <strong>${formatCHF(next)}</strong>/mois<br>
-    Écart : <strong>${formatCHF(diff)}</strong>/mois, soit <strong>${formatCHF(diff * 12)}</strong>/an<br><br>
-    <span class="small">Estimation indicative. Comparez avec votre lettre d'assureur.</span></div>`;
+  out.innerHTML = `<div class="result warning"><strong>Estimation 2027</strong><br>Prime estimée : <strong>${formatCHF(next)}</strong>/mois<br>Écart : <strong>${formatCHF(diff * 12)}</strong>/an</div>`;
 }
 
 function clearHealth(){
@@ -2129,15 +2046,14 @@ function clearHealth(){
 }
 
 function goTool(id){ openPanel("tools"); setTimeout(() => { const el = $(id); if(el) el.scrollIntoView({behavior:"smooth", block:"center"}); }, 150); }
-function healthLetter(){ openPanel("tools"); $("lType").value = "lamal"; setTimeout(() => $("lType").scrollIntoView({behavior:"smooth", block:"center"}), 150); }
+function healthLetter(){ openPanel("tools"); $("lType").value = "lamal"; }
 
 function addHealthReminder(){
   const dl = healthDeadline();
-  const text = "🏥 Envoyer la résiliation d'assurance maladie (dernier jour : " + fmtDate(dl) + ")";
+  const text = "🏥 Résiliation assurance maladie (" + fmtDate(dl) + ")";
   if(appData.documents.some(d => d.text === text)){ showToast("Rappel déjà ajouté"); return; }
   appData.documents.push({text, done:false, due:addDays(dl,-7)});
-  saveData(); renderList("documents"); renderToday();
-  showToast("Rappel ajouté : une semaine avant la date limite");
+  saveData(); renderList("documents"); showToast("Rappel ajouté");
 }
 
 /* ============================================================
@@ -2148,16 +2064,10 @@ function renderToday(){
   const tag = (list, src) => (list || []).map(i => ({...i, src}));
   const all = [...tag(appData.documents,"📄"), ...tag(appData.family,"👨‍👩‍👧‍👦"), ...tag(appData.applications,"🏠")].filter(i => !i.done && i.due).sort((a,b) => a.due.localeCompare(b.due));
   const late = all.filter(i => i.due < todayStr()).length;
-  const m = appData.money || {};
-  const bal = m.income ? m.income - ["rent","insurance","food","transport","bills","subscriptions","other"].reduce((s,k) => s + (+m[k] || 0), 0) : null;
   const hd = healthDays();
-  const hLine = hd <= 60 ? `<div class="row">🏥 Résiliation assurance maladie : ${hd} jour(s)</div>` : "";
-  if(!all.length && bal === null && !hLine){ box.innerHTML = ""; return; }
-  box.innerHTML = `<div class="result info" style="margin:0 0 14px"><strong>📅 Aujourd'hui</strong>
-    ${late ? `<div class="row">⚠️ ${late} échéance(s) en retard</div>` : ""}
-    ${hLine}
-    ${all.slice(0,3).map(i => `<div class="row">${i.src} ${escapeHtml(i.text)} : ${fmtDate(i.due)}</div>`).join("")}
-    ${bal !== null ? `<div class="row">💰 Solde mensuel : <strong>${formatCHF(bal)}</strong></div>` : ""}</div>`;
+  const hLine = hd <= 60 ? `<div class="row">🏥 Résiliation maladie : ${hd} j</div>` : "";
+  if(!all.length && !hLine){ box.innerHTML = ""; return; }
+  box.innerHTML = `<div class="result info" style="margin:0 0 14px"><strong>📅 Aujourd'hui</strong>${late ? `<div class="row">⚠️ ${late} en retard</div>` : ""}${hLine}${all.slice(0,3).map(i => `<div class="row">${i.src} ${escapeHtml(i.text)} : ${fmtDate(i.due)}</div>`).join("")}</div>`;
 }
 
 /* ============================================================
@@ -2180,23 +2090,20 @@ function validateNumber(){
   let ok = false, note = "";
   if(type === "iban"){
     ok = ibanValid(raw);
-    const c = raw.replace(/\s/g,"").toUpperCase().slice(0,2);
-    note = ok ? (["CH","LI"].includes(c) ? "IBAN suisse valide." : "IBAN valide, mais étranger (" + c + ").") : "Clé de contrôle incorrecte.";
+    note = ok ? "IBAN valide." : "IBAN incorrect.";
   }
   if(type === "avs"){
     ok = digits.length === 13 && digits.startsWith("756");
-    if(ok){ const sum = [...digits.slice(0,12)].reduce((a,d,i) => a + +d * (i % 2 ? 3 : 1), 0); ok = (10 - sum % 10) % 10 === +digits[12]; }
-    note = ok ? "Numéro AVS valide." : "Format 756.XXXX.XXXX.XX attendu.";
+    note = ok ? "N° AVS valide." : "Format 756.XXXX.XXXX.XX.";
   }
   if(type === "uid"){
-    const d = digits;
-    if(d.length === 9){
+    if(digits.length === 9){
       const w = [5,4,3,2,7,6,5,4];
-      const sum = w.reduce((a,x,i) => a + x * +d[i], 0);
+      const sum = w.reduce((a,x,i) => a + x * +digits[i], 0);
       let c = 11 - sum % 11; if(c === 11) c = 0;
-      ok = c !== 10 && c === +d[8];
+      ok = c !== 10 && c === +digits[8];
     }
-    note = ok ? "Numéro IDE valide." : "Numéro IDE invalide.";
+    note = ok ? "N° IDE valide." : "N° IDE invalide.";
   }
   out.innerHTML = raw ? `<div class="result ${ok ? "success" : "danger"}">${ok ? "✅" : "❌"} ${escapeHtml(note)}</div>` : `<div class="result warning">Saisissez un numéro.</div>`;
 }
@@ -2207,48 +2114,37 @@ function validateNumber(){
 function parseBill(t){
   const L = t.split(/\r?\n/);
   if(L[0] !== "SPC") return null;
-  return {iban:(L[3] || "").replace(/\s/g,""), name:L[5] || "", amount:L[18] || "", cur:L[19] || "", ref:L[28] || ""};
+  return {iban:(L[3] || "").replace(/\s/g,""), name:L[5] || "", amount:L[18] || "", cur:L[19] || ""};
 }
 
 function handleBill(e){
   const file = e.target.files[0]; const out = $("billResult");
   if(!file) return;
-  out.innerHTML = `<div class="result info">🔎 Lecture du QR en cours...</div>`;
+  out.innerHTML = `<div class="result info">🔎 Lecture...</div>`;
   const rd = new FileReader();
   rd.onload = async ev => {
     const raw = await readQR(ev.target.result);
     const b = raw ? parseBill(raw) : null;
-    if(!b){ out.innerHTML = `<div class="result danger">❌ Aucun QR-facture suisse lisible.</div>`; return; }
-    showBill(b);
+    if(!b){ out.innerHTML = `<div class="result danger">❌ Aucun QR-facture.</div>`; return; }
+    lastBill = b;
+    const ch = /^(CH|LI)/.test(b.iban); const ok = ibanValid(b.iban);
+    out.innerHTML = `<div class="result ${ok && ch ? "success" : "warning"}"><strong>🧾 QR-facture</strong>
+      <div class="row">Bénéficiaire : ${escapeHtml(b.name)}</div>
+      <div class="row">IBAN : ${escapeHtml(b.iban)} ${ok ? "✅" : "❌"}</div>
+      <div class="row">Montant : ${b.amount ? escapeHtml(b.amount + " " + b.cur) : "libre"}</div>
+      <div class="btn-row"><button type="button" class="btn primary" onclick="addBill()">➕ Ajouter</button></div></div>`;
   };
   rd.readAsDataURL(file);
 }
 
-function showBill(b){
-  const out = $("billResult");
-  lastBill = b;
-  const ch = /^(CH|LI)/.test(b.iban); const ok = ibanValid(b.iban);
-  out.innerHTML = `<div class="result ${ok && ch ? "success" : "warning"}"><strong>🧾 QR-facture lu</strong>
-    <div class="row">Bénéficiaire : <strong>${escapeHtml(b.name)}</strong></div>
-    <div class="row">IBAN : ${escapeHtml(b.iban)} ${ok ? "✅" : "❌"}</div>
-    <div class="row">Montant : <strong>${b.amount ? escapeHtml(b.amount + " " + b.cur) : "libre"}</strong></div>
-    ${ch ? "" : `<div class="row">⚠️ IBAN étranger.</div>`}
-    <div class="btn-row"><button type="button" class="btn primary" onclick="addBill()">➕ Ajouter à mes documents</button></div></div>`;
-}
-
-function stopBillCam(){
-  clearInterval(billTimer); billTimer = null;
-  if(billStream){ billStream.getTracks().forEach(t => t.stop()); billStream = null; }
-}
+function stopBillCam(){ if(billStream){ billStream.getTracks().forEach(t => t.stop()); billStream = null; } }
 
 async function addBill(){
   if(!lastBill) return;
   const res = await uiForm("Échéance de paiement", [{label:"Date (facultatif)", type:"date"}]);
   if(!res) return;
-  const due = res[0];
-  appData.documents.push({text:"Facture " + lastBill.name + (lastBill.amount ? " " + lastBill.amount + " " + lastBill.cur : ""), done:false, due});
-  saveData(); renderList("documents"); renderToday();
-  showToast("Facture ajoutée aux documents");
+  appData.documents.push({text:"Facture " + lastBill.name + (lastBill.amount ? " " + lastBill.amount : ""), done:false, due:res[0] || ""});
+  saveData(); renderList("documents"); showToast("Facture ajoutée");
 }
 
 function clearBill(){ lastBill = null; $("billResult").innerHTML = ""; $("billFile").value = ""; $("billFile2").value = ""; }
@@ -2257,18 +2153,18 @@ function clearBill(){ lastBill = null; $("billResult").innerHTML = ""; $("billFi
    Lettres types
    ============================================================ */
 const LETTERS = {
-  bail:(f) => `Objet : Résiliation de bail\n\nMadame, Monsieur,\n\nPar la présente, je résilie mon bail concernant le logement situé ${f.addr}, pour le prochain terme contractuel et dans le respect du délai de congé. ${f.detail}\n\nMerci de me confirmer la réception de ce courrier et de convenir d'une date pour l'état des lieux de sortie.`,
-  assurance:(f) => `Objet : Résiliation de mon contrat d'assurance\n\nMadame, Monsieur,\n\nPar la présente, je résilie mon contrat d'assurance pour la prochaine échéance possible. ${f.detail}\n\nMerci de me confirmer par écrit la fin du contrat.`,
-  amende:(f) => `Objet : Contestation d'amende\n\nMadame, Monsieur,\n\nJe conteste l'amende qui m'a été notifiée. ${f.detail}\n\nJe vous prie de bien vouloir réexaminer ma situation et de suspendre la procédure dans l'attente de votre réponse.`,
-  lamal:(f) => `Objet : Résiliation de l'assurance obligatoire des soins\n\nMadame, Monsieur,\n\nPar la présente, je résilie mon assurance obligatoire des soins (assurance de base) pour le 31 décembre ${new Date(healthDeadline() + "T12:00:00").getFullYear()}. ${f.detail}\n\nMerci de me confirmer par écrit la bonne réception de ce courrier et la fin du contrat.`,
-  loyer:(f) => `Objet : Demande de baisse de loyer\n\nMadame, Monsieur,\n\nLe taux d'intérêt de référence applicable aux loyers est actuellement de 1,25 %. ${f.detail}\n\nJe vous prie de bien vouloir me répondre par écrit dans un délai de 30 jours.`,
-  delai:(f) => `Objet : Demande de délai de paiement\n\nMadame, Monsieur,\n\nJe rencontre actuellement une difficulté temporaire et vous demande un délai de paiement pour la facture concernée. ${f.detail}\n\nJe vous propose de convenir d'un arrangement et vous remercie de votre compréhension.`
+  bail:(f) => `Objet : Résiliation de bail\n\nMadame, Monsieur,\n\nPar la présente, je résilie mon bail concernant le logement situé ${f.addr}, pour le prochain terme contractuel. ${f.detail}\n\nMerci de me confirmer la réception.`,
+  assurance:(f) => `Objet : Résiliation d'assurance\n\nMadame, Monsieur,\n\nPar la présente, je résilie mon contrat d'assurance pour la prochaine échéance possible. ${f.detail}\n\nMerci de me confirmer par écrit.`,
+  amende:(f) => `Objet : Contestation d'amende\n\nMadame, Monsieur,\n\nJe conteste l'amende notifiée. ${f.detail}\n\nJe vous prie de réexaminer ma situation.`,
+  lamal:(f) => `Objet : Résiliation LAMal\n\nMadame, Monsieur,\n\nJe résilie mon assurance obligatoire des soins pour le 31 décembre ${new Date(healthDeadline() + "T12:00:00").getFullYear()}. ${f.detail}\n\nMerci de confirmer la bonne réception.`,
+  loyer:(f) => `Objet : Demande de baisse de loyer\n\nMadame, Monsieur,\n\nLe taux de référence est actuellement de 1,25 %. ${f.detail}\n\nJe vous prie de me répondre dans un délai de 30 jours.`,
+  delai:(f) => `Objet : Demande de délai de paiement\n\nMadame, Monsieur,\n\nJe vous demande un délai pour la facture concernée. ${f.detail}\n\nMerci de votre compréhension.`
 };
 
 function makeLetter(){
   const f = {name:$("lName").value.trim(), addr:$("lAddr").value.trim(), to:$("lTo").value.trim(), detail:$("lDetail").value.trim()};
   const body = LETTERS[$("lType").value](f);
-  const reco = ["bail","assurance","lamal","loyer"].includes($("lType").value) ? "À envoyer en courrier recommandé." : "";
+  const reco = ["bail","assurance","lamal","loyer"].includes($("lType").value) ? "À envoyer en recommandé." : "";
   const parts = [];
   if(f.name) parts.push(f.name);
   if(f.addr) parts.push(f.addr);
@@ -2278,15 +2174,15 @@ function makeLetter(){
   parts.push(""); parts.push(body); parts.push("");
   parts.push("Veuillez agréer, Madame, Monsieur, mes salutations distinguées.");
   parts.push(""); parts.push(f.name || "________________________");
-  if(reco){ parts.push(""); parts.push("À envoyer en courrier recommandé."); }
+  if(reco){ parts.push(""); parts.push(reco); }
   const text = parts.join("\n");
   $("lOut").textContent = text;
   $("lOut").dataset.raw = text;
   showToast("Lettre générée");
 }
 
-function copyLetter(){ const text = $("lOut").dataset.raw || ""; if(!text){ showToast("Générez d'abord la lettre"); return; } copyText(text); }
-function printLetter(){ const text = $("lOut").dataset.raw || ""; if(!text){ showToast("Générez d'abord la lettre"); return; } window.print(); }
+function copyLetter(){ const text = $("lOut").dataset.raw || ""; if(!text){ showToast("Générez d'abord"); return; } copyText(text); }
+function printLetter(){ if(!$("lOut").dataset.raw){ showToast("Générez d'abord"); return; } window.print(); }
 function clearLetter(){ ["lName","lAddr","lTo","lDetail"].forEach(id => { const el = $(id); if(el) el.value = ""; }); $("lOut").textContent = ""; $("lOut").dataset.raw = ""; }
 
 /* ============================================================
@@ -2298,17 +2194,13 @@ function compareFranchise(){
   const fa = +$("fA").value, fb = +$("fB").value;
   const pa = parseFloat($("pA").value), pb = parseFloat($("pB").value), c = parseFloat($("fCosts").value);
   const out = $("fResult");
-  if(![pa,pb,c].every(Number.isFinite)){ out.innerHTML = `<div class="result warning">Remplissez les deux primes et vos frais prévus.</div>`; return; }
+  if(![pa,pb,c].every(Number.isFinite)){ out.innerHTML = `<div class="result warning">Remplissez les valeurs.</div>`; return; }
   const ca = franchiseCost(pa,fa,c), cb = franchiseCost(pb,fb,c);
   const best = ca <= cb ? "A" : "B";
-  out.innerHTML = `<div class="result success"><strong>🏥 Coût annuel estimé</strong><br><br>
-    Franchise ${fa} : <strong>${formatCHF(ca)}</strong><br>
-    Franchise ${fb} : <strong>${formatCHF(cb)}</strong><br><br>
-    ✅ Le choix ${best} est le moins cher (écart ${formatCHF(Math.abs(ca - cb))}).<br>
-    <span class="small">Primes + franchise + quote-part 10 % (max 700 CHF/an).</span></div>`;
+  out.innerHTML = `<div class="result success"><strong>🏥 Coût annuel</strong><br>Franchise ${fa} : <strong>${formatCHF(ca)}</strong><br>Franchise ${fb} : <strong>${formatCHF(cb)}</strong><br>✅ Choix ${best}</div>`;
 }
 
-function clearFranchise(){ ["pA","pB","fCosts"].forEach(id => { const el = $(id); if(el) el.value = ""; }); $("fA").value = "300"; $("fB").value = "2500"; $("fResult").innerHTML = ""; }
+function clearFranchise(){ ["pA","pB","fCosts"].forEach(id => { const el = $(id); if(el) el.value = ""; }); $("fResult").innerHTML = ""; }
 
 /* ============================================================
    Brut → net
@@ -2318,11 +2210,9 @@ function calcNet(){
   const lpp = parseFloat($("lppPct").value) || 0, aanp = parseFloat($("aanpPct").value) || 0;
   const out = $("netResult");
   if(!Number.isFinite(g) || g <= 0){ out.innerHTML = `<div class="result warning">Saisissez un salaire brut.</div>`; return; }
-  const rows = [["AVS / AI / APG (5,3 %)",5.3],["Assurance chômage (1,1 %)",1.1],["LPP (" + lpp + " %)",lpp],["Accident non prof. (" + aanp + " %)",aanp]];
+  const rows = [["AVS/AI/APG (5,3 %)",5.3],["Assurance chômage (1,1 %)",1.1],["LPP",lpp],["AANP",aanp]];
   const total = rows.reduce((a,x) => a + g * x[1] / 100, 0);
-  out.innerHTML = `<div class="result info"><strong>Net estimé : ${formatCHF(g - total)}</strong> par mois<br><br>
-    ${rows.map(x => `<div class="row">− ${formatCHF(g * x[1] / 100)} : ${escapeHtml(x[0])}</div>`).join("")}<br>
-    <span class="small">Estimation avant impôt. Voir votre fiche de salaire.</span></div>`;
+  out.innerHTML = `<div class="result info"><strong>Net estimé : ${formatCHF(g - total)}</strong>/mois<br>${rows.map(x => `<div class="row">− ${formatCHF(g * x[1] / 100)} : ${escapeHtml(x[0])}</div>`).join("")}</div>`;
 }
 
 function clearNet(){ $("gross").value = ""; $("lppPct").value = "5"; $("aanpPct").value = "1"; $("netResult").innerHTML = ""; }
@@ -2331,10 +2221,10 @@ function clearNet(){ $("gross").value = ""; $("lppPct").value = "5"; $("aanpPct"
    Parcours de vie
    ============================================================ */
 const LIFE = {
-  move:["🚚 Déménagement",[["Informer La Poste du changement d'adresse",-7],["Informer l'assurance maladie et l'employeur",-7],["Mettre à jour assurance ménage et RC",-14],["État des lieux de sortie",0],["Annoncer l'arrivée à la commune (dans les 14 jours)",14],["Récupérer la caution",30]]],
-  birth:["👶 Naissance",[["Informer l'employeur (congé, horaires)",-60],["Annoncer la naissance à l'état civil",3],["Affilier l'enfant à une assurance maladie",30],["Demander les allocations familiales",30],["Mettre à jour assurances et testament",90]]],
-  job:["💼 Nouveau travail",[["Signer le contrat de travail",-14],["Transmettre données bancaires et AVS à l'employeur",-7],["Transférer l'avoir de prévoyance (LPP)",30],["Vérifier assurance accident",7]]],
-  unemp:["📉 Perte d'emploi",[["S'inscrire à l'ORP",0],["Demander les indemnités à la caisse de chômage",7],["Rassembler contrat, certificats de salaire et lettre de congé",3],["Adapter le budget mensuel",7],["Vérifier assurance maladie et subsides",14]]]
+  move:["🚚 Déménagement",[["Informer La Poste",-7],["Informer assurance et employeur",-7],["État des lieux de sortie",0],["Annoncer à la commune (14j)",14],["Récupérer la caution",30]]],
+  birth:["👶 Naissance",[["Informer l'employeur",-60],["État civil",3],["Assurance maladie",30],["Allocations familiales",30],["Assurances",90]]],
+  job:["💼 Nouveau travail",[["Signer contrat",-14],["Données bancaires/AVS",-7],["Transférer LPP",30],["Assurance accident",7]]],
+  unemp:["📉 Perte d'emploi",[["S'inscrire à l'ORP",0],["Demander indemnités",7],["Rassembler documents",3],["Adapter budget",7]]]
 };
 
 function lifeSteps(){
@@ -2349,26 +2239,20 @@ function previewLife(){
 
 function applyLife(){
   const have = appData.documents.map(d => d.text);
-  const all = lifeSteps();
-  const add = all.filter(i => !have.includes(i.text));
-  if(add.length === 0){
-    $("lifeResult").innerHTML = `<div class="result warning">⚠️ Ces ${all.length} étapes sont <strong>déjà dans vos documents</strong>.<br>Utilisez « Retirer » d'abord si vous voulez les re-ajouter.</div>`;
-    showToast("Étapes déjà présentes");
-    return;
-  }
+  const add = lifeSteps().filter(i => !have.includes(i.text));
+  if(add.length === 0){ showToast("Étapes déjà présentes"); return; }
   add.forEach(i => appData.documents.push({text:i.text, done:false, due:i.due}));
   saveData(); renderList("documents"); renderToday();
-  $("lifeResult").innerHTML = `<div class="result success">✅ ${add.length} étape(s) ajoutée(s) dans « Documents ».</div>`;
-  showToast(add.length + " étape(s) ajoutée(s)");
+  $("lifeResult").innerHTML = `<div class="result success">✅ ${add.length} étape(s) ajoutée(s).</div>`;
 }
 
 async function removeLife(){
   const texts = lifeSteps().map(i => i.text);
   const n = appData.documents.filter(d => texts.includes(d.text)).length;
-  if(!n){ showToast("Aucune de ces étapes dans vos documents"); return; }
+  if(!n){ showToast("Aucune étape trouvée"); return; }
   if(!await uiConfirm("Retirer " + n + " étape(s) ?", "Retirer")) return;
   appData.documents = appData.documents.filter(d => !texts.includes(d.text));
-  saveData(); renderList("documents"); renderToday();
+  saveData(); renderList("documents");
   $("lifeResult").innerHTML = `<div class="result success">↩️ ${n} étape(s) retirée(s).</div>`;
 }
 
@@ -2377,7 +2261,7 @@ function clearLife(){ $("lifeType").selectedIndex = 0; $("lifeDate").value = "";
 /* ============================================================
    Calendrier
    ============================================================ */
-const SWISS_DATES = [["🏥 Assurance maladie : résiliation au plus tard le dernier jour ouvrable de novembre",11,30],["💼 3e pilier A : dernier versement de l'année",12,31],["🧾 Déclaration d'impôts (souvent, selon le canton)",3,31]];
+const SWISS_DATES = [["🏥 Résiliation maladie : dernier jour ouvrable de novembre",11,30],["💼 3e pilier A : dernier versement",12,31],["🧾 Déclaration d'impôts (selon canton)",3,31]];
 
 function nextDate(m, d){
   const t = todayStr(), y = new Date().getFullYear();
@@ -2396,11 +2280,11 @@ function renderCalendar(){
   calItems.sort((a,b) => a.due.localeCompare(b.due));
   $("calList").innerHTML = calItems.length ? `<div class="list">${calItems.map((i,n) => {
     const late = i.due < todayStr();
-    return `<div class="item"><span>${i.src} ${escapeHtml(i.text)}<span class="badge ${late ? "late" : ""}">${late ? "⚠️ En retard : " : "📅 "}${fmtDate(i.due)}</span></span>
+    return `<div class="item"><span>${i.src} ${escapeHtml(i.text)}<span class="badge ${late ? "late" : ""}">${late ? "⚠️ " : "📅 "}${fmtDate(i.due)}</span></span>
       <span style="display:flex;gap:6px;flex-shrink:0">
-        <button type="button" class="rm" style="background:#eef6ff;color:#15538a" onclick="gcal(${n})" aria-label="Google">📅</button>
-        <button type="button" class="rm" style="background:#f0f1f3;color:#333" onclick="editCal(${n})" aria-label="Modifier">✏️</button>
-        <button type="button" class="rm" onclick="delCal(${n})" aria-label="Supprimer">🗑️</button>
+        <button type="button" class="rm" style="background:#eef6ff;color:#15538a" onclick="gcal(${n})">📅</button>
+        <button type="button" class="rm" style="background:#f0f1f3;color:#333" onclick="editCal(${n})">✏️</button>
+        <button type="button" class="rm" onclick="delCal(${n})">🗑️</button>
       </span></div>`;
   }).join("")}</div>` : `<div class="empty">Aucune échéance.</div>`;
 }
@@ -2409,68 +2293,62 @@ async function editCal(n){
   const i = calItems[n]; if(!i) return;
   const fields = i.ref.list ? [{label:"Nom", value:i.text}] : [{text:i.text}];
   fields.push({label:"Date", type:"date", value:i.due});
-  const res = await uiForm("Modifier l'échéance", fields);
+  const res = await uiForm("Modifier", fields);
   if(!res) return;
   const due = res[res.length - 1]; const text = i.ref.list ? res[0] : i.text;
-  if(!due || !text){ showToast("Nom et date requis"); return; }
+  if(!due || !text) return;
   if(i.ref.list){
     const it = appData[i.ref.list][i.ref.idx]; if(!it) return;
     it.text = text; it.due = due;
     renderList(i.ref.list);
   }else{
     appData.swissOv = appData.swissOv || {};
-    appData.swissOv[i.ref.swiss] = Object.assign({}, appData.swissOv[i.ref.swiss], {due, hidden:false});
+    appData.swissOv[i.ref.swiss] = {due, hidden:false};
   }
-  saveData(); renderCalendar(); renderToday();
+  saveData(); renderCalendar();
 }
 
 async function delCal(n){
   const i = calItems[n];
-  if(!i || !await uiConfirm("Supprimer « " + i.text + " » ?", "Supprimer")) return;
+  if(!i || !await uiConfirm("Supprimer ?", "Supprimer")) return;
   if(i.ref.list){ appData[i.ref.list].splice(i.ref.idx,1); renderList(i.ref.list); }
   else { appData.swissOv = appData.swissOv || {}; appData.swissOv[i.ref.swiss] = {hidden:true}; }
-  saveData(); renderCalendar(); renderToday();
+  saveData(); renderCalendar();
 }
 
-function resetSwiss(){ delete appData.swissOv; saveData(); renderCalendar(); showToast("Dates par défaut restaurées"); }
+function resetSwiss(){ delete appData.swissOv; saveData(); renderCalendar(); showToast("Dates restaurées"); }
 
 function gcal(n){
   const i = calItems[n]; if(!i) return;
-  const d = i.due.replace(/-/g,"");
-  openExternal("https://calendar.google.com/calendar/render?action=TEMPLATE&text=" + encodeURIComponent(i.text) + "&dates=" + d + "/" + addDays(i.due,1).replace(/-/g,""));
+  openExternal("https://calendar.google.com/calendar/render?action=TEMPLATE&text=" + encodeURIComponent(i.text) + "&dates=" + i.due.replace(/-/g,"") + "/" + addDays(i.due,1).replace(/-/g,""));
 }
 
 async function exportICS(){
-  if(!calItems.length){ showToast("Aucune échéance à exporter"); return; }
+  if(!calItems.length){ showToast("Aucune échéance"); return; }
   const clean = t => String(t).replace(/[,;\\]/g," ").replace(/\n/g," ");
   const stamp = new Date().toISOString().replace(/[-:]/g,"").slice(0,15) + "Z";
-  const ev = calItems.map((i,n) => ["BEGIN:VEVENT","UID:helvetia-" + n + "-" + i.due + "@helvetia-tools","DTSTAMP:" + stamp,"DTSTART;VALUE=DATE:" + i.due.replace(/-/g,""),"DTEND;VALUE=DATE:" + addDays(i.due,1).replace(/-/g,""),"SUMMARY:" + clean(i.text),"BEGIN:VALARM","TRIGGER:-P1D","ACTION:DISPLAY","DESCRIPTION:" + clean(i.text),"END:VALARM","END:VEVENT"].join("\r\n"));
+  const ev = calItems.map((i,n) => ["BEGIN:VEVENT","UID:helvetia-" + n + "@helvetia-tools","DTSTAMP:" + stamp,"DTSTART;VALUE=DATE:" + i.due.replace(/-/g,""),"DTEND;VALUE=DATE:" + addDays(i.due,1).replace(/-/g,""),"SUMMARY:" + clean(i.text),"END:VEVENT"].join("\r\n"));
   const ics = ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Helvetia-Tools//FR",...ev,"END:VCALENDAR"].join("\r\n");
   const file = new File([ics], "echeances.ics", {type:"text/calendar"});
   try{ if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:"Échéances"}); return; } }catch(e){ if(e.name === "AbortError") return; }
-  try{
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(file);
-    a.download = "echeances.ics";
-    document.body.appendChild(a); a.click(); a.remove();
-    showToast("Fichier généré.");
-  }catch(e){ showToast("Export impossible ici"); }
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(file);
+  a.download = "echeances.ics";
+  document.body.appendChild(a); a.click(); a.remove();
 }
 
 async function clearCalendar(){
-  if(!calItems.length){ showToast("Aucune échéance à effacer"); return; }
-  if(!await uiConfirm("Supprimer toutes les échéances ?", "Tout effacer")) return;
+  if(!calItems.length){ showToast("Aucune échéance"); return; }
+  if(!await uiConfirm("Tout effacer ?", "Effacer")) return;
   ["documents","family","applications"].forEach(k => { appData[k] = (appData[k] || []).filter(i => !(i.due && !i.done)); });
-  appData.swissOv = {};
-  SWISS_DATES.forEach((x,n) => { appData.swissOv[n] = {hidden:true}; });
+  appData.swissOv = {}; SWISS_DATES.forEach((x,n) => { appData.swissOv[n] = {hidden:true}; });
   saveData(); renderCalendar(); renderAll();
-  showToast("Échéances effacées");
 }
 
 /* ============================================================
    QR Shield
    ============================================================ */
-const OFFICIAL = ["post.ch","swisscom.ch","postfinance.ch","sbb.ch","twint.ch","admin.ch","ch.ch","ubs.com","raiffeisen.ch","zkb.ch","migros.ch","coop.ch","sunrise.ch","salt.ch","localsearch.ch","local.ch","search.ch","ncsc.admin.ch","antiphishing.ch"];
+const OFFICIAL = ["post.ch","swisscom.ch","postfinance.ch","sbb.ch","twint.ch","admin.ch","ch.ch","ubs.com","raiffeisen.ch","zkb.ch","migros.ch","coop.ch","sunrise.ch","salt.ch","local.ch","search.ch","ncsc.admin.ch","antiphishing.ch"];
 const SHORTENERS = ["bit.ly","tinyurl.com","t.co","goo.gl","is.gd","cutt.ly","rb.gy","ow.ly","shorturl.at"];
 const BAD_TLD = ["xyz","top","click","icu","live","buzz","cyou","cfd","sbs","rest"];
 
@@ -2488,23 +2366,21 @@ function checkLink(url){
   const host = u.hostname.toLowerCase(), reg = host.split(".").slice(-2).join(".");
   const severe = [], flags = [];
   const official = OFFICIAL.includes(reg);
-  if(/^\d+\.\d+\.\d+\.\d+$/.test(host)) severe.push("Adresse numérique (IP)");
-  if(host.includes("xn--")) severe.push("Nom de domaine déguisé");
-  if(/@/.test(url)) severe.push("Le lien contient un @ trompeur");
+  if(/^\d+\.\d+\.\d+\.\d+$/.test(host)) severe.push("Adresse IP");
+  if(host.includes("xn--")) severe.push("Domaine déguisé");
+  if(/@/.test(url)) severe.push("Contient un @ trompeur");
   if(!official){
     const label = reg.split(".")[0];
     OFFICIAL.forEach(off => {
       const name = off.split(".")[0];
       if(name.length < 4) return;
-      if(label !== name && lev(label, name) <= 2) severe.push("Ressemble à " + off + " (copie)");
-      else if(label !== name && host.includes(name)) severe.push("Contient « " + name + " » mais appartient à " + reg);
+      if(label !== name && lev(label, name) <= 2) severe.push("Ressemble à " + off);
     });
   }
   if(SHORTENERS.includes(reg)) flags.push("Lien raccourci");
-  if(u.protocol === "http:") flags.push("Connexion non sécurisée (http)");
-  if(host.split(".").length > 4) flags.push("Beaucoup de sous-domaines");
-  if(BAD_TLD.includes(host.split(".").pop())) flags.push("Extension souvent utilisée par des arnaques");
-  if(/login|verify|secure|update|paiement|payment|colis|amende|tracking|remboursement|confirm/i.test(u.pathname + u.search)) flags.push("Mots typiques d'un faux site");
+  if(u.protocol === "http:") flags.push("Non sécurisé (http)");
+  if(host.split(".").length > 4) flags.push("Trop de sous-domaines");
+  if(BAD_TLD.includes(host.split(".").pop())) flags.push("Extension suspecte");
   return {host, reg, official, severe:[...new Set(severe)], flags, url:u.href};
 }
 
@@ -2512,24 +2388,21 @@ function analyzeQrContent(raw){
   const out = $("qrResult");
   let text = String(raw || "").trim();
   if(!text){ out.innerHTML = `<div class="result warning">Scannez un QR ou collez un lien.</div>`; return; }
-  if(text.startsWith("SPC")){ out.innerHTML = `<div class="result info">🧾 C'est un QR-facture suisse. Utilisez Outils → Lire un QR-facture.</div>`; return; }
+  if(text.startsWith("SPC")){ out.innerHTML = `<div class="result info">🧾 C'est un QR-facture.</div>`; return; }
   if(/^www\./i.test(text)) text = "https://" + text;
   const r = /^https?:\/\//i.test(text) ? checkLink(text) : null;
   if(!r){
-    out.innerHTML = `<div class="result info"><strong>Contenu du QR :</strong><br>${escapeHtml(text)}<div class="btn-row"><button type="button" class="btn primary" onclick="$('scamText').value=${escapeAttr(JSON.stringify(text))};analyzeScamText()">🛡️ Analyser comme texte</button></div></div>`;
+    out.innerHTML = `<div class="result info"><strong>Contenu :</strong> ${escapeHtml(text)}</div>`;
     return;
   }
   lastQr = r;
   const bad = r.severe.length > 0, warn = r.flags.length > 0;
   const cls = bad ? "danger" : warn ? "warning" : r.official ? "success" : "info";
-  const title = bad ? "🚨 Probablement frauduleux : n'ouvrez pas" : warn ? "⚠️ À vérifier avant d'ouvrir" : r.official ? "✅ Domaine officiel" : "ℹ️ Domaine inconnu";
-  out.innerHTML = `<div class="result ${cls}"><strong>${title}</strong><br><br>
-    Adresse réelle : <strong>${escapeHtml(r.host)}</strong><br>
-    <span class="small">${escapeHtml(r.url)}</span>
+  const title = bad ? "🚨 Probablement frauduleux" : warn ? "⚠️ À vérifier" : r.official ? "✅ Domaine officiel" : "ℹ️ Domaine inconnu";
+  out.innerHTML = `<div class="result ${cls}"><strong>${title}</strong><br>Adresse : <strong>${escapeHtml(r.host)}</strong>
     ${[...r.severe, ...r.flags].length ? "<ul style='margin:8px 0 0 20px'>" + [...r.severe, ...r.flags].map(f => `<li>${escapeHtml(f)}</li>`).join("") + "</ul>" : ""}
-    <br><span class="small">Un domaine inconnu n'est pas forcément sûr.</span>
     <div class="btn-row">
-      <button type="button" class="btn ${bad ? "" : "primary"}" onclick="openQr()">🔗 Ouvrir quand même</button>
+      <button type="button" class="btn ${bad ? "" : "primary"}" onclick="openQr()">🔗 Ouvrir</button>
       <button type="button" class="btn" onclick="copyText(lastQr.url)">📋 Copier</button>
       <button type="button" class="btn danger" onclick="reportQr()">🚩 Signaler</button>
     </div></div>`;
@@ -2538,21 +2411,21 @@ function analyzeQrContent(raw){
 async function openQr(){
   if(!lastQr) return;
   const risky = lastQr.severe.length || lastQr.flags.length || !lastQr.official;
-  if(risky && !await uiConfirm("Ce lien n'est pas reconnu comme sûr (" + lastQr.host + "). Ouvrir quand même ?", "Ouvrir")) return;
+  if(risky && !await uiConfirm("Lien non sûr. Ouvrir ?", "Ouvrir")) return;
   openExternal(lastQr.url);
 }
 
 function reportQr(){
   if(!lastQr) return;
-  copyQuiet("Lien suspect reçu via QR code : " + lastQr.url);
+  copyQuiet("Lien suspect : " + lastQr.url);
   openExternal("https://report.ncsc.admin.ch");
-  showToast("Résumé copié.");
+  showToast("Résumé copié");
 }
 
 function handleQrShield(e){
   const f = e.target.files[0], out = $("qrResult");
   if(!f) return;
-  out.innerHTML = `<div class="result info">🔎 Lecture du QR...</div>`;
+  out.innerHTML = `<div class="result info">🔎 Lecture...</div>`;
   const rd = new FileReader();
   rd.onload = async ev => {
     const raw = await readQR(ev.target.result);
@@ -2571,18 +2444,18 @@ function clearValidator(){ $("vInput").value = ""; $("vResult").innerHTML = ""; 
    ============================================================ */
 function restoreApp(){
   appData = loadData(); ensureData(); renderAll();
-  $("settingsResult").innerHTML = `<div class="result success">↩️ Les données enregistrées ont été rechargées.</div>`;
+  $("settingsResult").innerHTML = `<div class="result success">↩️ Données rechargées.</div>`;
   showToast("Données restaurées");
 }
 
 function exportData(){ copyText(JSON.stringify(appData,null,2)); }
 
 async function clearAllData(){
-  if(!await uiConfirm("ATTENTION : cette action effacera favoris, budget, logement, famille, documents et numéros enregistrés sur cet appareil. Continuer ?", "Tout effacer")) return;
+  if(!await uiConfirm("Effacer TOUTES les données locales ?", "Tout effacer")) return;
   localStorage.removeItem(STORAGE_KEY);
   OLD_KEYS.forEach(k => localStorage.removeItem(k));
   appData = cloneDefault(); saveData(); renderAll();
-  $("settingsResult").innerHTML = `<div class="result success">🗑️ Toutes les données locales ont été effacées.</div>`;
+  $("settingsResult").innerHTML = `<div class="result success">🗑️ Données effacées.</div>`;
   showToast("Données effacées");
 }
 
@@ -2608,13 +2481,6 @@ function uiForm(title, fields, ok = "OK"){
     };
     const onKey = e => {
       if(e.key === "Escape"){ e.preventDefault(); close(null); }
-      if(e.key === "Tab"){
-        const focusables = $("modal").querySelectorAll("button, input, select, textarea, [tabindex]:not([tabindex='-1'])");
-        if(!focusables.length) return;
-        const first = focusables[0], last = focusables[focusables.length - 1];
-        if(e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
-        else if(!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
-      }
     };
     $("modalOk").onclick = () => close(fields.map((f,i) => f.text ? null : $("mf" + i).value.trim()));
     $("modalCancel").onclick = () => close(null);
@@ -2660,8 +2526,9 @@ document.addEventListener("DOMContentLoaded", () => {
   updateBackToTop();
   initFirebaseAuth();
   updateCloudUI();
-  initOneSignal();
+  initFCM();
 });
 </script>
 </body>
 </html>
+
