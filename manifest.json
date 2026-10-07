@@ -1,10 +1,10 @@
 {
   "name": "Helvetia-Tools",
   "short_name": "Helvetia",
-  "id": "./",
+  "id": "/helvetia-tools-v2/",
   "description": "Assistant suisse pour les démarches du quotidien",
-  "start_url": "./",
-  "scope": "./",
+  "start_url": "/helvetia-tools-v2/",
+  "scope": "/helvetia-tools-v2/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#f4f6f8",
