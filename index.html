@@ -297,7 +297,7 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
   </div>
   <div class="section">
     <div class="section-title">🏛️ Estimation d'impôts (simplifiée)</div>
-    <p class="small" style="margin-bottom:8px">Estimation approximative basée sur les barèmes 2024. Votre vrai impôt dépend de votre situation complète.</p>
+    <p class="small" style="margin-bottom:8px">Estimation approximative basée sur les barèmes 2024.</p>
     <div class="form-grid">
       <div class="field"><label for="taxCanton">Canton</label>
         <select id="taxCanton"><option value="VD">Vaud (VD)</option><option value="GE">Genève (GE)</option><option value="VS">Valais (VS)</option><option value="FR">Fribourg (FR)</option><option value="NE">Neuchâtel (NE)</option><option value="JU">Jura (JU)</option><option value="BE">Berne (BE)</option><option value="ZH">Zurich (ZH)</option><option value="TI">Tessin (TI)</option></select></div>
@@ -311,15 +311,6 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
       <button type="button" class="btn danger" onclick="clearTaxes()">🗑️ Effacer</button>
     </div>
     <div id="taxResult" aria-live="polite"></div>
-  </div>
-  <div class="section">
-    <div class="section-title">🧰 Outils financiers</div>
-    <div class="tool-grid">
-      <div class="tool"><h3>📊 Budget</h3><p>Calculez vos dépenses et votre solde mensuel.</p></div>
-      <div class="tool"><h3>🧾 Factures</h3><p>Gardez une vue sur vos charges mensuelles.</p></div>
-      <div class="tool"><h3>🔄 Abonnements</h3><p>Ajoutez vos abonnements dans votre budget.</p></div>
-      <div class="tool"><h3>🇨🇭 Aides</h3><p>Accédez aux ressources administratives suisses.</p></div>
-    </div>
   </div>
 </div></section>
 
@@ -444,7 +435,7 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
   </div>
   <div class="section">
     <div class="section-title">💰 Comparateur de primes LAMal (estimation)</div>
-    <p class="small" style="margin-bottom:8px">Estimation basée sur des moyennes 2025. Les vraies primes varient selon la caisse, la région et le modèle.</p>
+    <p class="small" style="margin-bottom:8px">Estimation basée sur des moyennes 2025.</p>
     <div class="form-grid">
       <div class="field"><label for="pAge">Âge</label>
         <select id="pAge"><option value="young">18-25 ans</option><option value="adult" selected>26-50 ans</option><option value="senior">51-65 ans</option></select></div>
@@ -475,7 +466,7 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
 
 <section id="panel-rent" class="panel"><div class="panel-body">
   <div class="section">
-    <div class="result info" style="margin:0"><strong>📉 Taux de référence : 1,25 %</strong><br>En vigueur depuis le 2 septembre 2025. Si votre loyer repose sur un taux de 1,5 % ou plus, vous avez en principe droit à une baisse.</div>
+    <div class="result info" style="margin:0"><strong>📉 Taux de référence : 1,25 %</strong><br>En vigueur depuis le 2 septembre 2025.</div>
   </div>
   <div class="section">
     <div class="section-title">🧮 Ma baisse possible</div>
@@ -685,6 +676,8 @@ const firebaseConfig = {
 };
 
 const VAPID_KEY = "BPcWlacOhcir34qAeHaBj2z_k9Ei6aoCErOzfQwwKzdPFk2W3GK8mdpyf9UT4W46uZanNM_A2uL0y6GewMUdda0";
+const SW_PATH = "/helvetia-tools-v2/firebase-messaging-sw.js";
+const SW_SCOPE = "/helvetia-tools-v2/";
 
 let fbApp = null, fbAuth = null, fbDb = null, fbMessaging = null;
 let currentUser = null;
@@ -693,6 +686,7 @@ let syncInProgress = false;
 let lastLocalSave = 0;
 let fcmReady = false;
 let fcmToken = null;
+let swRegistration = null;
 
 try {
   if(typeof firebase !== "undefined"){
@@ -826,7 +820,7 @@ function showToast(msg){
 }
 
 /* ============================================================
-   FIREBASE CLOUD MESSAGING (FCM)
+   FIREBASE CLOUD MESSAGING (FCM) — CORRIGÉ
    ============================================================ */
 
 function pushStatus(state, text){
@@ -845,22 +839,29 @@ function showPushMessage(msg, type = "info"){
   setTimeout(() => { if(box.innerHTML.includes(msg)) box.innerHTML = ""; }, 5000);
 }
 
-function initFCM(){
+async function initFCM(){
   try{
     if(typeof firebase === "undefined" || !firebase.messaging){
       pushStatus("off", "Firebase Messaging non disponible");
       return;
     }
 
-    // Enregistrer le Service Worker Firebase
+    // 1. Enregistrer le Service Worker avec le BON chemin
     if("serviceWorker" in navigator){
-      navigator.serviceWorker.register("/helvetia-tools-v2/firebase-messaging-sw.js", {scope: "/helvetia-tools-v2/"})
-        .then(reg => console.log("SW Firebase enregistré :", reg.scope))
-        .catch(err => console.warn("Erreur SW Firebase :", err));
+      try{
+        swRegistration = await navigator.serviceWorker.register(SW_PATH, {scope: SW_SCOPE});
+        console.log("✅ Service Worker Firebase enregistré :", swRegistration.scope);
+      }catch(err){
+        console.error("❌ Erreur Service Worker :", err);
+        pushStatus("off", "Erreur SW : " + (err.message || "inconnue"));
+        return;
+      }
     }
 
-    // Écouter les messages en premier plan
+    // 2. Initialiser Firebase Messaging
     const messaging = firebase.messaging();
+
+    // 3. Écouter les messages en premier plan
     messaging.onMessage((payload) => {
       console.log("Message foreground :", payload);
       const title = (payload.notification && payload.notification.title) || "Helvetia-Tools";
@@ -932,14 +933,27 @@ async function enablePushNotifications(){
       updatePushUI();
       return;
     }
+
+    // Attendre que le SW soit prêt
+    if(!swRegistration){
+      try{ swRegistration = await navigator.serviceWorker.ready; }catch(e){}
+    }
+
     const messaging = firebase.messaging();
-    const token = await messaging.getToken({vapidKey: VAPID_KEY});
+    const token = await messaging.getToken({
+      vapidKey: VAPID_KEY,
+      serviceWorkerRegistration: swRegistration || undefined
+    });
+
     if(token){
       fcmToken = token;
-      console.log("Token FCM obtenu :", token.substring(0,20) + "...");
+      console.log("✅ Token FCM obtenu");
       if(currentUser && fbDb){
         try{
-          await fbDb.collection("users").doc(currentUser.uid).set({fcmToken: token, fcmUpdatedAt: Date.now()}, {merge:true});
+          await fbDb.collection("users").doc(currentUser.uid).set({
+            fcmToken: token,
+            fcmUpdatedAt: Date.now()
+          }, {merge:true});
         }catch(e){ console.warn("Erreur sauvegarde token :", e); }
       }
       showPushMessage("✅ Notifications activées !", "success");
@@ -1318,7 +1332,7 @@ function calcTaxes(){
     Revenu imposable : <strong>${formatCHF(base)}</strong><br>
     Impôt annuel estimé : <strong>${formatCHF(tax)}</strong><br>
     Taux effectif : <strong>${eff} %</strong><br><br>
-    <span class="small">⚠️ Estimation indicative basée sur barèmes 2024. Consultez l'administration fiscale.</span></div>`;
+    <span class="small">⚠️ Estimation indicative. Consultez l'administration fiscale.</span></div>`;
 }
 function clearTaxes(){
   ["taxIncome","taxDeductions"].forEach(id => { const el = $(id); if(el) el.value = ""; });
@@ -1347,7 +1361,7 @@ function calcPrimeRange(){
   out.innerHTML = `<div class="result success"><strong>💰 Estimation prime mensuelle</strong><br><br>
     Canton : <strong>${escapeHtml(canton)}</strong><br>
     Fourchette : <strong>CHF ${Math.round(low)} – ${Math.round(high)} / mois</strong><br><br>
-    <span class="small">⚠️ Estimation basée sur des moyennes 2025. Comparez sur priminfo.admin.ch.</span></div>`;
+    <span class="small">⚠️ Estimation. Comparez sur priminfo.admin.ch.</span></div>`;
 }
 function clearPrimeRange(){ $("pPrimeResult").innerHTML = ""; }
 
