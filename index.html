@@ -694,12 +694,11 @@ try {
     fbApp = firebase.initializeApp(firebaseConfig);
     
             // Firebase AI Logic
-      alert("firebase.ai = " + typeof firebase.ai + " | firebase.ai() = " + typeof (firebase.ai && firebase.ai));
-      if (firebase.ai) {
-        try {
-          fbAI = firebase.ai();
-          console.log("✅ Firebase AI Logic initialisé");
-        } catch (e) {
+            alert("firebase.getAI = " + typeof firebase.getAI);
+  try {
+    fbAI = firebase.getAI();
+    console.log("✅ Firebase AI Logic initialisé");
+  } catch (e) {
           console.warn("IA non disponible :", e);
           alert("Erreur fbAI init : " + e.message);
         }
