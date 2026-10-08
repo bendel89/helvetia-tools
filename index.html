@@ -8,6 +8,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="description" content="Helvetia-Tools — assistant suisse pour les démarches du quotidien.">
 <title>Helvetia-Tools — Assistant suisse</title>
+<script>
+  self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+</script>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" sizes="192x192" href="launchericon-192x192.png">
 <link rel="apple-touch-icon" sizes="512x512" href="launchericon-512x512.png">
@@ -1600,7 +1603,7 @@ function globalSearch(){
 async function askGemini(prompt){
   try{
     const apiKey = firebaseConfig.apiKey;
-    const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + apiKey;
+    const url = "https://firebasevertexai.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + apiKey;
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
