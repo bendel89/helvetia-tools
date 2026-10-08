@@ -679,7 +679,7 @@ const VAPID_KEY = "BPcWlacOhcir34qAeHaBj2z_k9Ei6aoCErOzfQwwKzdPFk2W3GK8mdpyf9UT4
 const SW_PATH = "/helvetia-tools-v2/firebase-messaging-sw.js";
 const SW_SCOPE = "/helvetia-tools-v2/";
 
-let fbApp = null, fbAuth = null, fbDb = null, fbMessaging = null;
+let fbApp = null, fbAuth = null, fbDb = null, fbMessaging = null, fbAppCheck = null;
 let currentUser = null;
 let firestoreUnsubscribe = null;
 let syncInProgress = false;
@@ -691,6 +691,16 @@ let swRegistration = null;
 try {
   if(typeof firebase !== "undefined"){
     fbApp = firebase.initializeApp(firebaseConfig);
+      // APP CHECK
+      if (firebase.appCheck) {
+        try {
+          fbAppCheck = firebase.appCheck();
+          fbAppCheck.activate("6LdheuUtAAAAAHoFfdfQmyRSxKzc-n18N9lTBVAA", true);
+          console.log("✅ App Check activé");
+        } catch (e) {
+          console.warn("App Check non activé :", e);
+        }
+      }
     fbAuth = firebase.auth();
     fbDb = firebase.firestore();
     fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(e => console.warn("Persistance:", e));
