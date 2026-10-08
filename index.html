@@ -2617,6 +2617,34 @@ document.addEventListener("DOMContentLoaded", () => {
   initFCM();
 });
 </script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getAI, getGenerativeModel, GoogleAIBackend } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-ai.js";
+  import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCVN3jsDqQAAaniP9IXurWXSnsX0Xk3aWE",
+    authDomain: "helvetia-tools.firebaseapp.com",
+    projectId: "helvetia-tools",
+    storageBucket: "helvetia-tools.firebasestorage.app",
+    messagingSenderId: "125008868109",
+    appId: "1:125008868109:web:4687d2b05b94701ecf7644"
+  };
+
+  const app = initializeApp(firebaseConfig);
+
+  initializeAppCheck(app, {
+    provider: new ReCaptchaEnterpriseProvider("6Ld7feUtAAAAAE6PpKPfFCauZDxRJ1pSqZ6XFsFQ"),
+    isTokenAutoRefreshEnabled: true
+  });
+
+  const ai = getAI(app, { backend: new GoogleAIBackend() });
+  const model = getGenerativeModel(ai, { model: "gemini-2.0-flash" });
+
+  window.firebaseAIModel = model;
+
+  console.log("✅ Firebase AI Logic et App Check initialisés");
+</script>
 </body>
 </html>
 
