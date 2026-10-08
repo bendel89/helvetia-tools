@@ -696,15 +696,17 @@ try {
   if(typeof firebase !== "undefined"){
     fbApp = firebase.initializeApp(firebaseConfig);
     
-                  // Firebase AI Logic
-      if (firebase.getAI) {
+                        // Firebase AI Logic (nouveau SDK)
+      if (window.firebaseAI) {
         try {
-          fbAI = firebase.getAI();
+          const { getAI, GoogleAIBackend } = window.firebaseAI;
+          fbAI = getAI(fbApp, { backend: new GoogleAIBackend() });
           console.log("✅ Firebase AI Logic initialisé");
         } catch (e) {
           console.warn("IA non disponible :", e);
         }
       }
+      
       
       // APP CHECK
       if (firebase.appCheck) {
@@ -1607,11 +1609,12 @@ function globalSearch(){
    GEMINI — Assistant IA
    ============================================================ */
 async function askGemini(prompt){
-  if(!fbAI){
+  if(!fbAI || !window.firebaseAI){
     return null;
   }
   try{
-    const model = fbAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const { getGenerativeModel } = window.firebaseAI;
+    const model = getGenerativeModel(fbAI, { model: "gemini-2.0-flash" });
     const result = await model.generateContent(prompt);
     return result.response.text();
   }catch(e){
