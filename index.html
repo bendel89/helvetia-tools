@@ -1603,15 +1603,17 @@ function globalSearch(){
    GEMINI — Assistant IA
    ============================================================ */
 async function askGemini(prompt){
-  if(!fbAI){
+    if(!fbAI){
+    alert("fbAI est null — l'IA n'est pas initialisée");
     return null;
   }
   try{
     const model = fbAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     const result = await model.generateContent(prompt);
     return result.response.text();
-  }catch(e){
+   }catch(e){
     console.warn("Erreur Gemini :", e);
+    alert("Erreur Gemini : " + (e.message || e.code || JSON.stringify(e)));
     return null;
   }
 }
