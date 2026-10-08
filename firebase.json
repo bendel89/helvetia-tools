@@ -1,14 +1,7 @@
 {
   "functions": {
     "source": "functions",
-    "runtime": "nodejs20"
-  },
-  "hosting": {
-    "public": ".",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ]
+    "runtime": "nodejs20",
+    "serviceAccount": "helvetia-tools@appspot.gserviceaccount.com"
   }
 }
