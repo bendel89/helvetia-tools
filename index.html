@@ -1168,13 +1168,25 @@ function initFirebaseAuth(){
       }catch(e){
         showCloudMessage("⚠️ Synchronisation impossible pour l'instant", "warning");
       }
+
+      // 🆕 AJOUT : Re-sauvegarder le token FCM s'il existe déjà
+      if(fcmToken){
+        try{
+          await fbDb.collection("users").doc(user.uid).set({
+            fcmToken: fcmToken,
+            fcmUpdatedAt: Date.now()
+          }, {merge:true});
+          console.log("✅ Token FCM re-sauvegardé après connexion");
+        }catch(e){
+          console.warn("Erreur re-sauvegarde token:", e);
+        }
+      }
     } else {
       showCloudMessage("Déconnecté. Données locales uniquement.", "info");
       if(firestoreUnsubscribe){ firestoreUnsubscribe(); firestoreUnsubscribe = null; }
     }
   });
 }
-
 /* ============================================================
    Partage natif
    ============================================================ */
