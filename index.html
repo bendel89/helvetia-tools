@@ -696,7 +696,7 @@ try {
   if(typeof firebase !== "undefined"){
     fbApp = firebase.initializeApp(firebaseConfig);
     
-                        // Firebase AI Logic (nouveau SDK)
+                                    // Firebase AI Logic (nouveau SDK)
       if (window.firebaseAI) {
         try {
           const { getAI, GoogleAIBackend } = window.firebaseAI;
@@ -706,11 +706,6 @@ try {
           console.warn("IA non disponible :", e);
         }
       }
-      
-      
-      // APP CHECK
-      if (firebase.appCheck) {
-        try {
           fbAppCheck = firebase.appCheck();
           fbAppCheck.activate("6LdheuUtAAAAAHoFfdfQmyRSxKzc-n18N9lTBVAA", true);
           console.log("✅ App Check activé");
