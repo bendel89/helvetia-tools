@@ -1599,11 +1599,42 @@ function globalSearch(){
   if(m) routeTo(m, raw);
   else { openPanel("assistant"); $("assistantInput").value = raw; analyzeAssistant(); }
 }
-
-function analyzeAssistant(){
+/* ============================================================
+   GEMINI — Assistant IA
+   ============================================================ */
+async function askGemini(prompt){
+  if(!fbAI){
+    return null;
+  }
+  try{
+    const model = fbAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+  }catch(e){
+    console.warn("Erreur Gemini :", e);
+    return null;
+  }
+}
+async function analyzeAssistant(){
   const raw = $("assistantInput").value.trim();
   const result = $("assistantResult");
   if(!raw){ result.innerHTML = `<div class="result warning">Écrivez votre demande.</div>`; return; }
+
+  // Étape 1 : Essayer avec Gemini
+  result.innerHTML = `<div class="result info">🤖 L'assistant réfléchit…</div>`;
+  const aiResponse = await askGemini(
+    "Tu es un assistant suisse qui aide avec les démarches administratives. " +
+    "Réponds en français, de manière claire et concise. " +
+    "Question de l'utilisateur : " + raw
+  );
+
+  if(aiResponse){
+    result.innerHTML = `<div class="result success"><strong>🤖 Assistant IA</strong><br><br>${escapeHtml(aiResponse)}</div>`;
+    return;
+  }
+
+  // Étape 2 : Fallback sur l'ancien système (règles)
+  console.log("Gemini indisponible, fallback sur règles");
   const m = detectModule(raw);
   if(m && m !== "company"){
     const info = MODULES[m];
