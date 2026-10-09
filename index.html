@@ -660,6 +660,7 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.0/dist/tesseract.min.js"></script>
@@ -1602,26 +1603,14 @@ function globalSearch(){
    ============================================================ */
 async function askGemini(prompt){
   try{
-    const apiKey = firebaseConfig.apiKey;
-    const url = "https://firebasevertexai.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + apiKey;
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }]
-      })
-    });
-    if(!response.ok){
-      console.warn("Gemini HTTP " + response.status);
-      return null;
-    }
-    const data = await response.json();
-    if(data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0]){
-      return data.candidates[0].content.parts[0].text;
+    const askClaude = firebase.functions().httpsCallable('askClaude');
+    const result = await askClaude({ prompt: prompt });
+    if(result.data && result.data.text){
+      return result.data.text;
     }
     return null;
   }catch(e){
-    console.warn("Erreur Gemini :", e);
+    console.warn("Erreur Claude :", e);
     return null;
   }
 }
