@@ -1935,6 +1935,33 @@ function decodeJsQR(src, w, h, sizes = [1600,1000,2400]){
   }
   return "";
 }
+async function analyzeImageWithClaude(imageDataUrl){
+  try{
+    const matches = imageDataUrl.match(/^data:(image\/[a-z]+);base64,(.+)$/);
+    if(!matches){
+      return null;
+    }
+    const imageMimeType = matches[1];
+    const imageBase64 = matches[2];
+
+    const askClaude = firebase.functions().httpsCallable('askClaude');
+    const result = await askClaude({
+      image: imageBase64,
+      imageMimeType: imageMimeType,
+      prompt: "Analyse cette image. S'agit-il d'une arnaque ? Donne un score sur 100 et les signaux d'alerte."
+    });
+
+    if(result.data && result.data.text){
+      return result.data.text;
+    }
+    return null;
+  }catch(e){
+    console.warn("Erreur analyse image:", e);
+    return null;
+  }
+}
+
+
 
 async function extractOCR(){
   const result = $("scamResult");
