@@ -1,8 +1,13 @@
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { defineSecret } = require("firebase-functions/params");
+const { logger } = require("firebase-functions");
+
 admin.initializeApp();
 
-// Fonction qui tourne tous les jours à 9h
+const ANTHROPIC_API_KEY = defineSecret("ANTHROPIC_API_KEY");
+
 exports.dailyReminders = functions.pubsub
   .schedule("every day 09:00")
   .timeZone("Europe/Zurich")
@@ -13,11 +18,9 @@ exports.dailyReminders = functions.pubsub
     const targetDate = new Date(today);
     targetDate.setDate(today.getDate() + 7);
     const targetStr = targetDate.toISOString().split("T")[0];
-    const todayStr = today.toISOString().split("T")[0];
 
     console.log("Recherche des échéances pour le :", targetStr);
 
-    // Récupère tous les utilisateurs
     const usersSnap = await db.collection("users").get();
     let sent = 0;
 
@@ -26,38 +29,37 @@ exports.dailyReminders = functions.pubsub
       const token = userData.fcmToken;
       if (!token) continue;
 
-      // Récupère les données de l'utilisateur
       let appData;
       try {
         appData = JSON.parse(userData.data || "{}");
-      } catch (e) { continue; }
+      } catch (e) {
+        continue;
+      }
 
       const documents = appData.documents || [];
       const family = appData.family || [];
       const applications = appData.applications || [];
 
-      // Cherche les échéances dans 7 jours
       const allItems = [...documents, ...family, ...applications];
-      const dueItems = allItems.filter(item => 
-        !item.done && item.due === targetStr
+      const dueItems = allItems.filter(
+        (item) => !item.done && item.due === targetStr
       );
 
       if (dueItems.length === 0) continue;
 
-      // Envoie une notification
       for (const item of dueItems) {
         try {
           await messaging.send({
             token: token,
             notification: {
               title: "📅 Rappel Helvetia-Tools",
-              body: `${item.text} - échéance dans 7 jours (${targetStr})`
+              body: `${item.text} - échéance dans 7 jours (${targetStr})`,
             },
             webpush: {
               fcmOptions: {
-                link: "https://bendel89.github.io/helvetia-tools-v2/"
-              }
-            }
+                link: "https://bendel89.github.io/helvetia-tools-v2/",
+              },
+            },
           });
           sent++;
         } catch (e) {
@@ -69,3 +71,38 @@ exports.dailyReminders = functions.pubsub
     console.log("Total notifications envoyées :", sent);
     return null;
   });
+
+exports.askClaude = onCall(
+  { secrets: [ANTHROPIC_API_KEY], region: "us-central1" },
+  async (request) => {
+    const prompt = request.data && request.data.prompt;
+    if (!prompt) {
+      throw new HttpsError("invalid-argument", "Prompt manquant.");
+    }
+
+    const apiKey = ANTHROPIC_API_KEY.value();
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 1024,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      logger.error("Erreur Claude", response.status, errText);
+      throw new HttpsError("internal", `Claude ${response.status}: ${errText}`);
+    }
+
+    const data = await response.json();
+    return { text: data.content[0].text };
+  }
+);
