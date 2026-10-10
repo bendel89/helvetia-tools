@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
@@ -8,6 +8,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="description" content="Helvetia-Tools — assistant suisse pour les démarches du quotidien.">
 <title>Helvetia-Tools — Assistant suisse</title>
+<script>
+  self.FIREBASE_APPCHECK_DEBUG_TOKEN = "8F9D6717-0C8C-46DF-BCB6-FC987A5F6A8F";
+</script>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" sizes="192x192" href="launchericon-192x192.png">
 <link rel="apple-touch-icon" sizes="512x512" href="launchericon-512x512.png">
@@ -657,6 +660,8 @@ input[type=date]{min-width:0;max-width:100%;display:block;-webkit-appearance:non
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.0/dist/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
@@ -679,7 +684,7 @@ const VAPID_KEY = "BPcWlacOhcir34qAeHaBj2z_k9Ei6aoCErOzfQwwKzdPFk2W3GK8mdpyf9UT4
 const SW_PATH = "/helvetia-tools-v2/firebase-messaging-sw.js";
 const SW_SCOPE = "/helvetia-tools-v2/";
 
-let fbApp = null, fbAuth = null, fbDb = null, fbMessaging = null;
+let fbApp = null, fbAuth = null, fbDb = null, fbMessaging = null, fbAppCheck = null, fbAI = null;
 let currentUser = null;
 let firestoreUnsubscribe = null;
 let syncInProgress = false;
@@ -691,6 +696,21 @@ let swRegistration = null;
 try {
   if(typeof firebase !== "undefined"){
     fbApp = firebase.initializeApp(firebaseConfig);
+    
+                                          // Firebase AI Logic (nouveau SDK)
+            // Firebase AI Logic — activation via REST API
+      fbAI = true;
+      
+      // APP CHECK
+      if (firebase.appCheck) {
+        try {
+          fbAppCheck = firebase.appCheck();
+          fbAppCheck.activate("6LdheuUtAAAAAHoFfdfQmyRSxKzc-n18N91TBVAA", true);
+          console.log("✅ App Check activé");
+        } catch (e) {
+          console.warn("App Check non activé :", e);
+        }
+      }
     fbAuth = firebase.auth();
     fbDb = firebase.firestore();
     fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(e => console.warn("Persistance:", e));
@@ -1168,13 +1188,25 @@ function initFirebaseAuth(){
       }catch(e){
         showCloudMessage("⚠️ Synchronisation impossible pour l'instant", "warning");
       }
+
+      // 🆕 AJOUT : Re-sauvegarder le token FCM s'il existe déjà
+      if(fcmToken){
+        try{
+          await fbDb.collection("users").doc(user.uid).set({
+            fcmToken: fcmToken,
+            fcmUpdatedAt: Date.now()
+          }, {merge:true});
+          console.log("✅ Token FCM re-sauvegardé après connexion");
+        }catch(e){
+          console.warn("Erreur re-sauvegarde token:", e);
+        }
+      }
     } else {
       showCloudMessage("Déconnecté. Données locales uniquement.", "info");
       if(firestoreUnsubscribe){ firestoreUnsubscribe(); firestoreUnsubscribe = null; }
     }
   });
 }
-
 /* ============================================================
    Partage natif
    ============================================================ */
@@ -1566,11 +1598,42 @@ function globalSearch(){
   if(m) routeTo(m, raw);
   else { openPanel("assistant"); $("assistantInput").value = raw; analyzeAssistant(); }
 }
-
-function analyzeAssistant(){
+/* ============================================================
+   GEMINI — Assistant IA
+   ============================================================ */
+async function askGemini(prompt){
+  try{
+    const askClaude = firebase.functions().httpsCallable('askClaude');
+    const result = await askClaude({ prompt: prompt });
+    if(result.data && result.data.text){
+      return result.data.text;
+    }
+    return null;
+  }catch(e){
+    console.warn("Erreur Claude :", e);
+    return null;
+  }
+}
+async function analyzeAssistant(){
   const raw = $("assistantInput").value.trim();
   const result = $("assistantResult");
   if(!raw){ result.innerHTML = `<div class="result warning">Écrivez votre demande.</div>`; return; }
+
+  // Étape 1 : Essayer avec Gemini
+  result.innerHTML = `<div class="result info">🤖 L'assistant réfléchit…</div>`;
+  const aiResponse = await askGemini(
+    "Tu es un assistant suisse qui aide avec les démarches administratives. " +
+    "Réponds en français, de manière claire et concise. " +
+    "Question de l'utilisateur : " + raw
+  );
+
+  if(aiResponse){
+    result.innerHTML = `<div class="result success"><strong>🤖 Assistant IA</strong><br><br>${escapeHtml(aiResponse)}</div>`;
+    return;
+  }
+
+  // Étape 2 : Fallback sur l'ancien système (règles)
+  console.log("Gemini indisponible, fallback sur règles");
   const m = detectModule(raw);
   if(m && m !== "company"){
     const info = MODULES[m];
@@ -2542,6 +2605,34 @@ document.addEventListener("DOMContentLoaded", () => {
   updateCloudUI();
   initFCM();
 });
+</script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getAI, getGenerativeModel, GoogleAIBackend } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-ai.js";
+  import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCVN3jsDqQAAaniP9IXurWXSnsX0Xk3aWE",
+    authDomain: "helvetia-tools.firebaseapp.com",
+    projectId: "helvetia-tools",
+    storageBucket: "helvetia-tools.firebasestorage.app",
+    messagingSenderId: "125008868109",
+    appId: "1:125008868109:web:4687d2b05b94701ecf7644"
+  };
+
+  const app = initializeApp(firebaseConfig);
+
+  initializeAppCheck(app, {
+    provider: new ReCaptchaEnterpriseProvider("6Ld7feUtAAAAAE6PpKPfFCauZDxRJ1pSqZ6XFsFQ"),
+    isTokenAutoRefreshEnabled: true
+  });
+
+  const ai = getAI(app, { backend: new GoogleAIBackend() });
+  const model = getGenerativeModel(ai, { model: "gemini-2.0-flash" });
+
+  window.firebaseAIModel = model;
+
+  console.log("✅ Firebase AI Logic et App Check initialisés");
 </script>
 </body>
 </html>
